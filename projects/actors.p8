@@ -11,10 +11,10 @@ function create_player(x, y)
     return {
         x = x,
         y = y,
+        spd={x=0, y=0},
         k = 2,
         hitbox = {x=0, y=0, w=8, h=8},
         move = function(self, dx, dy)
-            print("move: " .. dx .. ", " .. dy, 0, 0, 7)
             self.x = self.x + dx
             self.y = self.y + dy
         end,
@@ -92,7 +92,6 @@ function _update()
     collided = false
     for obs in all(obstacles) do
         if collide(player, obs, dir[1] * v, dir[2] * v) then
-            debug="boom"
             collided = true
             player:on_collide(obs)
         end
@@ -107,8 +106,6 @@ function _draw()
     map()
 
     player:draw()
-
-    print(debug)
 end
 __gfx__
 00000000ddddddddeeeeeeee00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

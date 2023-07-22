@@ -7,6 +7,10 @@ g = 1 -- Z gravity
 pxi = 8*8
 pyi = 1*8
 player_load = 0
+objects = {}
+
+rock_k = 2
+tree_k = 3
 
 trail = {}
 particles = {}
@@ -25,6 +29,78 @@ function gauss_rng()
         sum = sum + rnd(1)
     end
     return sum - 6
+end
+
+function create_player(x, y)
+    return {
+        x = x,
+        y = y,
+        z = 0,
+        spd = {x=0, y=0},
+        dir = {0, 0},
+        k = 10,
+        hitbox = {x=1, y=7, w=6, h=1},
+        jumping = false,
+        grinding = false,
+        move = function(self, dx, dy)
+            self.x = self.x + dx
+            self.y = self.y + dy
+        end,
+        draw = function(self)
+            spr(self.k, self.x, self.y)
+        end,
+        on_collide = function(self, b)
+        end,
+        collide = function(self, other, dx, dy)
+            if other.x+other.hitbox.x+other.hitbox.w > self.x+self.hitbox.x+dx and 
+                other.y+other.hitbox.y+other.hitbox.h > self.y+self.hitbox.y+dy and
+                other.x+other.hitbox.x < self.x+self.hitbox.x+self.hitbox.w+dx and 
+                other.y+other.hitbox.y < self.y+self.hitbox.y+self.hitbox.h+dy then
+                return other
+            end
+            return nil
+        end,
+        update_hitbox = function(self)
+            if self.k == 7 then
+                self.hitbox = {x=3, y=1, w=2, h=7}
+            elseif self.k == 8 or self.k == 9 then
+                self.hitbox = {x=1, y=7, w=6, h=0}
+            elseif self.k == 10 then
+                self.hitbox = {x=1, y=7, w=6, h=0}
+            end
+        end
+    }
+end
+
+function create_obs(x, y, k)
+    return {
+        x = x,
+        y = y,
+        k = k,
+        type=tile_types["solid"],
+        hitbox = {x=0, y=0, w=8, h=8},
+        move = function(self, dx, dy)
+            self.x = self.x + dx
+            self.y = self.y + dy
+        end,
+        draw = function(self)
+            spr(self.k, self.x, self.y)
+        end
+    }
+end
+
+function create_rock(x, y)
+    local r = create_obs(x, y, rock_k)
+    r.hitbox = {x=2, y=2, w=5, h=3}
+
+    return r
+end
+
+function create_tree(x, y)
+    local t = create_obs(x, y, tree_k)
+    t.hitbox = {x=3, y=4, w=2, h=4}
+
+    return t
 end
 
 function is_tile(type, x, y)
@@ -90,7 +166,7 @@ function update_particles()
     end
 
     if not p.jumping then
-        make_particles(p.vy * 2 + abs(p.vx))
+        make_particles(p.spd.y * 2 + abs(p.spd.x))
     end
 end
 
@@ -100,39 +176,40 @@ function update_player()
         return
     end
 
-    local s = 7
+    local k = 7
     local down_speed = 0.0001 -- adjust to change how fast the player transitions to moving down
+    local dir = {0, 0}
 
     -- Decrease horizontal speed and increase vertical speed over time when no button is pressed
     if not (btn(0) or btn(1) or btn(2) or btn(3)) then
-        p.vx = max(0, p.vx - down_speed) -- Gradually decrease vx to 0
-        p.vy = min(3, p.vy + down_speed * p.vy + .02) -- Accelerate vy, speed increases slowly initially and faster later
-        p.target_dir = {0, 1} -- Gradually change target direction to moving down
+        p.spd.x = max(0, p.spd.x - down_speed) -- Gradually decrease vx to 0
+        p.spd.y = min(3, p.spd.y + down_speed * p.spd.y + .02) -- Accelerate vy, speed increases slowly initially and faster later
+        dir = {0, 1} -- Gradually change target direction to moving down
     end
 
     if btn(0) then
-        p.target_dir = {-1, 0} -- left
-        p.vx = 2
-        p.vy = max(.5, p.vy - .01 * p.vx)
-        s = 9 
+        dir[1] = -1
+        p.spd.x = 2
+        p.spd.y = max(.5, p.spd.y - .01 * p.spd.x)
+        k = 9 
     end
 
     if btn(1) then
-        p.target_dir = {1, 0} -- right
-        p.vx = 2
-        p.vy = max(.5, p.vy - .01 * p.vx)
-        s = 8
+        dir[1] = 1
+        p.spd.x = 2
+        p.spd.y = max(.5, p.spd.y - .01 * p.spd.x)
+        k = 8
     end
      
     if btn(2) then
-        p.target_dir = {0, -1} -- up: slow down
-        p.vy *= .9
-        s = 10
+        dir[2] = -1
+        p.spd.y *= .9
+        k = 10
     end
 
     if btn(3) then
-        p.target_dir = {0, 1} -- down: speed up
-        s = 7
+        dir[2] = 1
+        k = 7
     end
 
     if btn(4) and not p.jumping then
@@ -142,32 +219,43 @@ function update_player()
         p.z = 15 -- jump frames
     end
 
-    local turn_speed = 0.1 -- adjust this value to change how fast the player turns
-    p.dir[1] = lerp(p.dir[1], p.target_dir[1], turn_speed)
-    p.dir[2] = lerp(p.dir[2], p.target_dir[2], turn_speed)
+    p.k = k
 
-    p.sprite = s
+    p:update_hitbox()
+    -- p.target_dir = dir
+
+    local collide = nil
+    for obs in all(objects) do
+        if not p.jumping and p:collide(obs, dir[1] * p.spd.x, dir[2] * p.spd.y) then
+            collided = true
+            p:on_collide(obs)
+            collide = obs
+        end
+    end
+
+    local turn_speed = 0.1 -- adjust this value to change how fast the player turns
+    dir[1] = lerp(p.dir[1], dir[1], turn_speed)
+    dir[2] = lerp(p.dir[2], dir[2], turn_speed)
+
+    p.dir = dir
+
+    if (not collide) p:move(dir[1] * p.spd.x, dir[2] * p.spd.y)
 
     if p.grinding then
-        if collide(p, "jib") then
-            p.sprite = 11
-            p.vx = 0
+        if collide and collide.type == tile_types["jib"] then
+            p.k = 11
+            p.spd.x = 0
         else
             p.grinding = false
         end
     end
-
-    p.x = p.x + p.vx * p.dir[1]
-    p.y = p.y + p.vy * p.dir[2]
-
-    debug = "vx: " .. p.vx * p.dir[1] .. ", vy: " .. p.vy * p.dir[2]
 
     if p.jumping then
         local pz = p.z - g
         if pz >= 0 then
             p.z = pz
 
-            if collide(p, "jib") then
+            if collide and collide.type == tile_types["jib"] then
                 p.jumping = true
                 p.grinding = true
             end
@@ -178,7 +266,7 @@ function update_player()
             -- debug = "end jump"
         end
     else
-        if not p.grinding and collide(p, "solid") then
+        if not p.grinding and collide and collide.type == tile_types["solid"] then
             -- debug="collide"
             make_explode(40)
             player_load = 30
@@ -188,47 +276,32 @@ function update_player()
     end
 end
 
-function collide(o, tile_type)
-    local off = 3 -- hardcoded player offset to 3 for now
-    local x1 = (o.x + off) / 8
-    local y1 = o.y / 8
-    local x2 = (o.x + 7 - off) / 8
-    local y2 = (o.y + 7) / 8
-
-    local f = tile_types[tile_type]
-
-    local a = fget(mget(x1, y1), f)
-    local b = fget(mget(x1, y2), f)
-    local c = fget(mget(x2, y2), f)
-    local d = fget(mget(x2, y1), f)
-
-    if a or b or c or d then
-        return true
-    else
-        return false
-    end
-end
-
 function reset_player()
     p.x = pxi
     p.y = pyi
-    p.vx = 0
-    p.vy = 0.1
+    p.spd.x = 0
+    p.spd.y = .1
+end
+
+function load_room()
+    -- TODO: load objects based on camera view
+    for x=1,15 do
+        for y=1,15 do
+            local tile = mget(x, y)
+            if tile == tree_k then
+                add(objects, create_tree(x*8, y*8))
+            elseif tile == rock_k then
+                add(objects, create_rock(x*8, y*8))
+            end
+        end
+    end
+
+    debug=#objects
 end
 
 function _init()
-    p = {
-        x = pxi,
-        y = pyi,
-        z = 0,
-        vx = 0,
-        vy = 0.1,
-        jumping = false,
-        grinding = false,
-        sprite = 10,
-        dir = {0, -1}, -- direction
-        target_dir = {0, -1} -- target direction
-    }
+    load_room()
+    p = create_player(pxi, pyi)
 end
 
 function _update()
@@ -238,10 +311,11 @@ end
 
 function _draw()
     cls()
+    map()
+
     if player_load == 0 then
         camera(p.x - 63 + 4, p.y - 63 + 4)
     end
-    map()
 
     for part in all(trail) do
         circfill(part.x, part.y, 0, part.col)
@@ -260,7 +334,7 @@ function _draw()
 
     -- draw player
     if player_load == 0 then
-        spr(p.sprite, p.x, p.y - p.z) -- Adjust player's y position based on jump height
+        spr(p.k, p.x, p.y - p.z) -- Adjust player's y position based on jump height
     end
 end
 
