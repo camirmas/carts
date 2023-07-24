@@ -11,6 +11,7 @@ objects = {}
 
 rock_k = 2
 tree_k = 3
+logs_k = {36, 37}
 
 trail = {}
 particles = {}
@@ -45,11 +46,40 @@ function create_player(x, y)
         move = function(self, dx, dy)
             self.x = self.x + dx
             self.y = self.y + dy
+
+            if p.jumping then
+                local pz = p.z - g
+                if pz >= 0 then
+                    p.z = pz
+                else
+                    p.z = 0
+                    p.jumping = false
+                    sfx(1)
+                    -- debug = "end jump"
+                end
+            end
         end,
         draw = function(self)
             spr(self.k, self.x, self.y)
         end,
-        on_collide = function(self, b)
+        on_collide = function(self, other)
+            if p.jumping and other.type == tile_types["jib"] then
+                -- debug="grinding"
+                p.grinding = true
+            elseif p.grinding then
+                if other.type == tile_types["jib"] then
+                    p.k = 11
+                    p.spd.x = 0
+                else
+                    p.grinding = false
+                end
+            else
+                debug="collide"
+                make_explode(40)
+                player_load = 30
+                reset_player() 
+                sfx(2)
+            end
         end,
         collide = function(self, other, dx, dy)
             if other.x+other.hitbox.x+other.hitbox.w > self.x+self.hitbox.x+dx and 
@@ -99,6 +129,13 @@ end
 function create_tree(x, y)
     local t = create_obs(x, y, tree_k)
     t.hitbox = {x=3, y=4, w=2, h=4}
+
+    return t
+end
+
+function create_log(x, y, k)
+    local t = create_obs(x, y, k)
+    t.type = tile_types["jib"]
 
     return t
 end
@@ -213,8 +250,9 @@ function update_player()
     end
 
     if btn(4) and not p.jumping then
-        debug = "jumping"
+        -- debug = "jumping"
         p.jumping = true
+        p.grinding = false
         sfx(0)
         p.z = 15 -- jump frames
     end
@@ -224,56 +262,22 @@ function update_player()
     p:update_hitbox()
     -- p.target_dir = dir
 
-    local collide = nil
+    local has_collided = false
     for obs in all(objects) do
-        if not p.jumping and p:collide(obs, dir[1] * p.spd.x, dir[2] * p.spd.y) then
-            collided = true
+        local collide = p:collide(obs, dir[1] * p.spd.x, dir[2] * p.spd.y)
+        if collide then
+            has_collided = true
             p:on_collide(obs)
-            collide = obs
         end
     end
+
+    if (not has_collided and p.grinding) p.grinding = false
 
     local turn_speed = 0.1 -- adjust this value to change how fast the player turns
     dir[1] = lerp(p.dir[1], dir[1], turn_speed)
     dir[2] = lerp(p.dir[2], dir[2], turn_speed)
-
     p.dir = dir
-
-    if (not collide) p:move(dir[1] * p.spd.x, dir[2] * p.spd.y)
-
-    if p.grinding then
-        if collide and collide.type == tile_types["jib"] then
-            p.k = 11
-            p.spd.x = 0
-        else
-            p.grinding = false
-        end
-    end
-
-    if p.jumping then
-        local pz = p.z - g
-        if pz >= 0 then
-            p.z = pz
-
-            if collide and collide.type == tile_types["jib"] then
-                p.jumping = true
-                p.grinding = true
-            end
-        else
-            p.z = 0
-            p.jumping = false
-            sfx(1)
-            -- debug = "end jump"
-        end
-    else
-        if not p.grinding and collide and collide.type == tile_types["solid"] then
-            -- debug="collide"
-            make_explode(40)
-            player_load = 30
-            reset_player() 
-            sfx(2)
-        end
-    end
+    p:move(dir[1] * p.spd.x, dir[2] * p.spd.y)
 end
 
 function reset_player()
@@ -292,11 +296,13 @@ function load_room()
                 add(objects, create_tree(x*8, y*8))
             elseif tile == rock_k then
                 add(objects, create_rock(x*8, y*8))
+            elseif tile == logs_k[1] or tile == logs_k[2] then
+                add(objects, create_log(x*8, y*8))
             end
         end
     end
 
-    debug=#objects
+    -- debug=#objects
 end
 
 function _init()
