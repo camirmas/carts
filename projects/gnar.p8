@@ -12,6 +12,7 @@ objects = {}
 rock_k = 2
 tree_k = 3
 logs_k = {36, 37}
+trail_color = 6
 
 trail = {}
 particles = {}
@@ -39,10 +40,13 @@ function create_player(x, y)
         z = 0,
         spd = {x=0, y=0},
         dir = {0, 0},
+        combo_score = 0,
+        score = 0,
+        jib_mult = 20,
         k = 10,
         hitbox = {x=1, y=7, w=6, h=1},
         jumping = false,
-        grinding = false,
+        jibbing = false,
         move = function(self, dx, dy)
             self.x = self.x + dx
             self.y = self.y + dy
@@ -64,14 +68,14 @@ function create_player(x, y)
         end,
         on_collide = function(self, other)
             if p.jumping and other.type == tile_types["jib"] then
-                -- debug="grinding"
-                p.grinding = true
-            elseif p.grinding then
+                -- debug="jibbing"
+                p.jibbing = true
+            elseif p.jibbing then
                 if other.type == tile_types["jib"] then
                     p.k = 11
                     p.spd.x = 0
                 else
-                    p.grinding = false
+                    p.jibbing = false
                 end
             else
                 debug="collide"
@@ -146,9 +150,10 @@ end
 
 function make_particles(n)
     for i=1, n do
-        local color = 6
-        if p.grinding then
-            color = rnd(15) + 1
+        if p.jibbing then
+            trail_color = rnd(15) + 1
+        else
+            trail_color = 6
         end
 
         local part = {
@@ -158,7 +163,7 @@ function make_particles(n)
             vy = 0.05 * gauss_rng(),
             t = 0, -- time alive
             lifetime = rnd(30 * 1.25), -- sec @ 30fps
-            col = color -- color
+            col = trail_color -- color
         }
         add(trail, part)
     end
@@ -213,6 +218,14 @@ function update_player()
         return
     end
 
+    if p.jibbing and not p.jumping then
+        p.combo_score = p.combo_score + p.jib_mult
+        -- debug=p.score
+    else
+        p.score = p.score + p.combo_score
+        p.combo_score = 0
+    end
+
     local k = 7
     local down_speed = 0.0001 -- adjust to change how fast the player transitions to moving down
     local dir = {0, 0}
@@ -252,7 +265,7 @@ function update_player()
     if btn(4) and not p.jumping then
         -- debug = "jumping"
         p.jumping = true
-        p.grinding = false
+        p.jibbing = false
         sfx(0)
         p.z = 15 -- jump frames
     end
@@ -271,7 +284,7 @@ function update_player()
         end
     end
 
-    if (not has_collided and p.grinding) p.grinding = false
+    if (not has_collided and p.jibbing) p.jibbing = false
 
     local turn_speed = 0.1 -- adjust this value to change how fast the player turns
     dir[1] = lerp(p.dir[1], dir[1], turn_speed)
@@ -341,6 +354,10 @@ function _draw()
     -- draw player
     if player_load == 0 then
         spr(p.k, p.x, p.y - p.z) -- Adjust player's y position based on jump height
+    end
+
+    if p.jibbing and p.combo_score > 0 then
+        print(p.combo_score, p.x, p.y - 8, trail_color)
     end
 end
 
