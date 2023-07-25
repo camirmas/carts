@@ -13,6 +13,8 @@ rock_k = 2
 tree_k = 3
 logs_k = {36, 37}
 trail_color = 6
+combo_timer = 0
+combo_colors = {1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 15}
 
 trail = {}
 particles = {}
@@ -69,6 +71,7 @@ function create_player(x, y)
         on_collide = function(self, other)
             if p.jumping and other.type == tile_types["jib"] then
                 -- debug="jibbing"
+                combo_timer = 60
                 p.jibbing = true
             elseif p.jibbing then
                 if other.type == tile_types["jib"] then
@@ -77,6 +80,8 @@ function create_player(x, y)
                 else
                     p.jibbing = false
                 end
+            elseif p.jumping then
+                return
             else
                 debug="collide"
                 make_explode(40)
@@ -149,11 +154,10 @@ function is_tile(type, x, y)
 end
 
 function make_particles(n)
+    local color = trail_color
     for i=1, n do
         if p.jibbing then
-            trail_color = rnd(15) + 1
-        else
-            trail_color = 6
+            color = combo_colors[flr(rnd(#combo_colors)) + 1]
         end
 
         local part = {
@@ -163,7 +167,7 @@ function make_particles(n)
             vy = 0.05 * gauss_rng(),
             t = 0, -- time alive
             lifetime = rnd(30 * 1.25), -- sec @ 30fps
-            col = trail_color -- color
+            col = color -- color
         }
         add(trail, part)
     end
@@ -218,12 +222,15 @@ function update_player()
         return
     end
 
-    if p.jibbing and not p.jumping then
+    if p.jibbing then
         p.combo_score = p.combo_score + p.jib_mult
-        -- debug=p.score
     else
-        p.score = p.score + p.combo_score
-        p.combo_score = 0
+        combo_timer = combo_timer - 1
+
+        if (combo_timer == 0) then 
+            p.score = p.combo_score
+            p.combo_score = 0
+        end
     end
 
     local k = 7
@@ -265,7 +272,6 @@ function update_player()
     if btn(4) and not p.jumping then
         -- debug = "jumping"
         p.jumping = true
-        p.jibbing = false
         sfx(0)
         p.z = 15 -- jump frames
     end
@@ -332,8 +338,10 @@ function _draw()
     cls()
     map()
 
+    c = {x = mid(0, p.x - 63 + 4, 16*8-1), y = mid(0, p.y - 63 + 4, 16*8-1)}
+
     if player_load == 0 then
-        camera(p.x - 63 + 4, p.y - 63 + 4)
+        camera(c.x, c.y)
     end
 
     for part in all(trail) do
@@ -344,21 +352,27 @@ function _draw()
         circfill(part.x, part.y, 0, part.col)
     end
 
-    print(debug, p.x - 63 + 8, p.y - 63 + 8)
-
-    -- draw shadow
-    if p.jumping then
-        spr(27, p.x, p.y + p.z / 4) -- Draw shadow sprite, assuming shadow sprite is 11
-    end
-
     -- draw player
     if player_load == 0 then
         spr(p.k, p.x, p.y - p.z) -- Adjust player's y position based on jump height
+
+        -- draw shadow
+        if p.jumping then
+            spr(27, p.x, p.y + p.z / 4) -- Draw shadow sprite, assuming shadow sprite is 11
+        end
     end
 
-    if p.jibbing and p.combo_score > 0 then
-        print(p.combo_score, p.x, p.y - 8, trail_color)
+    -- draw top bar
+    rectfill(c.x, c.y, c.x + 16*8 - 1, c.y + 10, 6)
+    -- draw score
+    print("score: " .. p.score, c.x + 2, c.y + 3, 1)
+
+    -- combo
+    if combo_timer > 0 then
+        print(p.combo_score, p.x, p.y - 8, flr(rnd(#combo_colors)))
     end
+
+    print(debug, p.x, p.y - 3)
 end
 
 __gfx__
@@ -533,6 +547,7 @@ __sfx__
 9110002000350003500000000000003500035014300123000f3000c30004350043500430002300003000030002350023500030000300023500235000300003000000000000043500435000000000000000000000
 4d1000003662500600006003662500000000003662500600366250060000600006003662536625006000060036625006000060000600006000060036625006003662500600006000060036625366250060000000
 011000002d050000002b0500000000000000002d050000002b0500000000000230502305000000240500000028050000000000000000000000000000000000002105000000000001f0501f050000002105000000
+9304000007000090000a0000c0000e000100001200015050180501d0502105024050270502a050310003300035000360003600037000340002f000280001e0001600011000100000f0000e0000e0000f0000f000
 __music__
 02 03040544
 
