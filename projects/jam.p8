@@ -10,7 +10,10 @@ k_up=2
 k_down=3
 
 n_waves = 10
+n_waves_max = 30
+n_fishing_spots = 5
 
+fishing_spots = {}
 waves = {}
 objects = {}
 
@@ -20,6 +23,59 @@ function gauss_rng()
         sum = sum + rnd(1)
     end
     return sum - 6
+end
+
+function create_fishing_spots()
+	for i=1,n_fishing_spots do
+		local spot = {
+			x = flr(rnd(128)),
+			y = flr(rnd(128)),
+			lifetime = rnd(30 * 20), -- sec @ 30fps
+			t = 0, -- time alive
+			bubbles = {},
+
+			update = function(self)
+				if (self.t >= self.lifetime) del(self.bubbles, self)
+
+				for bubble in all(self.bubbles) do
+					bubble:update()
+				end
+			end,
+
+			draw = function(self)
+				for bubble in all(self.bubbles) do
+					bubble:draw()
+				end
+			end
+		}
+		local n_bubbles = max(3, flr(rnd(6)))
+		for i=1,n_bubbles do
+			local bubble = {
+				x = spot.x + 2 * gauss_rng(),
+				y = spot.y + 2 * gauss_rng(),
+				r_max = max(2, 2.7 * gauss_rng()),
+				dr = .1,
+				r = 0,
+
+				update = function(self)
+					local nr = self.r + self.dr
+
+					if nr > self.r_max then
+						self.r = 0
+					else
+						self.r = nr
+					end
+				end,
+
+				draw = function(self)
+					circ(self.x, self.y, self.r, 1)
+				end
+			}
+			add(spot.bubbles, bubble)
+		end
+
+		add(fishing_spots, spot)
+	end
 end
 
 function create_waves()
@@ -112,7 +168,7 @@ function create_player(x, y)
 
 			self:update_hitbox()
 
-			debug = "x: " .. self.dir.x .. ", y: " .. self.dir.y
+			-- debug = "x: " .. self.dir.x .. ", y: " .. self.dir.y
 
 			player:move(self.dir.x * self.spd.x, self.dir.y * self.spd.y)
 		end,
@@ -173,9 +229,12 @@ states = {
 				wave:update()
 			end
 
-			if #waves < 30 then
-				create_waves()
+			for spot in all(fishing_spots) do
+				spot:update()
 			end
+
+			if (#waves < n_waves_max) create_waves()
+			if (#fishing_spots < n_fishing_spots) create_fishing_spots()
 		end,
 		_draw = function()
 			cls()
@@ -183,6 +242,10 @@ states = {
 
 			for wave in all(waves) do
 				wave:draw()
+			end
+
+			for spot in all(fishing_spots) do
+				spot:draw()
 			end
 
 			player:draw()
