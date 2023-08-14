@@ -8,6 +8,7 @@ k_left=0
 k_right=1
 k_up=2
 k_down=3
+
 n_waves = 10
 
 waves = {}
@@ -82,7 +83,7 @@ function create_player(x, y)
 				self.dir.x = -1
 				self.k_raft = 9
 				self.k_player = 6
-				self.flip.x = true
+				self.flip = {x=true, y=false}
 			end
 
 			if btn(k_right) then
@@ -90,7 +91,7 @@ function create_player(x, y)
 				self.dir.x = 1
 				self.k_raft = 9
 				self.k_player = 6
-				self.flip.x = false
+				self.flip = {x = false, y = false}
 			end
 
 			if btn(k_up) then
@@ -98,6 +99,7 @@ function create_player(x, y)
 				self.dir.y = -1
 				self.k_raft = 7
 				self.k_player = 5
+				self.flip = {x = false, y = false}
 			end
 
 			if btn(k_down) then
@@ -105,6 +107,7 @@ function create_player(x, y)
 				self.dir.y = 1
 				self.k_raft = 7
 				self.k_player = 4
+				self.flip = {x = false, y = true}
 			end
 
 			self:update_hitbox()
@@ -123,13 +126,13 @@ function create_player(x, y)
 			-- draw player
 			local px = self.x + self.hitbox.w / 2 - 4
 			local py = self.y + self.hitbox.h / 2 - 4
-            spr(self.k_player, px, py, 1, 1, self.flip.x, self.flip.y)
+            spr(self.k_player, px, py, 1, 1, self.flip.x, false)
 
 			palt(0, true)
 			palt(11, false)
 
 			-- draw hitbox (debug)
-			rect(self.x, self.y, self.x + self.hitbox.w, self.y + self.hitbox.h, 11)
+			-- rect(self.x, self.y, self.x + self.hitbox.w, self.y + self.hitbox.h, 11)
         end,
 
         collide = function(self, other, dx, dy)
