@@ -9,7 +9,12 @@ k_left=0
 k_right=1
 k_up=2
 k_down=3
+k_O = 4
+k_X = 5
 k_rock = 19
+k_hook = 11 -- soon to have more
+
+g = 1 -- gravity
 
 n_waves = 10
 n_waves_max = 30
@@ -105,6 +110,48 @@ function create_waves()
 	end
 end
 
+function create_hook(x, y, dir)
+	local hook = {
+		start = {x=x, y=y},
+		x = x,
+		y = y,		
+		dir = dir,
+		z = 15,
+		k = k_hook,
+
+		update = function(self)
+			local z = self.z - g
+
+			if z >= 0 then
+				self.z = z
+				self.x = self.x + 1.5 * self.dir.x
+				self.y = self.y + 1.5 * self.dir.y
+			else
+				-- check fishing
+			end
+		end,
+
+		draw = function(self)
+			line(self.start.x, self.start.y, self.x, self.y, 10)
+
+			local xo, yo
+			if dir.x == 1 then
+				xo = -3	
+				yo = -2	
+			elseif dir.x == -1 then
+				xo = -4	
+				yo = -2	
+			else
+				xo = -4	
+				yo = -4	
+			end
+			spr(self.k, self.x + xo, self.y + yo, 1, 1, dir.x == 1, dir.y == -1)
+		end
+	}
+
+	return hook
+end
+
 function create_player(x, y)
 	return {
 		x = x,
@@ -112,11 +159,15 @@ function create_player(x, y)
 		spd = {x=0, y=0},
 		acc = {x=0, y=0},
 		dir = {x=0, y=0},
-		flip = {x=false, y=true}, -- initially facing down right
-		max_spd = 1,
+		cast_dir = {x=0, y=-1},
+        hitbox = {x=0, y=0, w=12, h=16},
 		k_player = 4,
 		k_raft = 7,
-        hitbox = {x=0, y=0, w=12, h=16},
+		flip = {x=false, y=true}, -- initially facing down right
+		max_spd = 1,
+		hook = nil,
+		casting = false,
+		retrieving = false,
 
 		update_hitbox = function(self)
 			if self.k_raft == 9 then
@@ -127,7 +178,6 @@ function create_player(x, y)
 		end,
 
 		move = function(self, dx, dy)
-			debug = ""
 			local collided = false
 			for obj in all(objects) do
 				if self:collide(obj, dx, dy) then
@@ -135,55 +185,79 @@ function create_player(x, y)
 					dx = 0
 					dy = 0
 				end
-
-				if collided then
-					debug = "collided"
-				end
 			end
 
 			self.x = self.x + dx
 			self.y = self.y + dy
 		end,
+		
+		cast = function(self)
+			self.casting = true
+			local px = self.x + self.hitbox.w / 2 - 4
+			local py = self.y + self.hitbox.h / 2 - 4
+			self.hook = create_hook(px, py, self.cast_dir)
+		end,
+
+		retrieve = function(self)
+			self.casting = false
+			self.hook = nil
+
+			-- check fishing
+		end,
 
 		update = function(self)
+			if self.casting and self.hook ~= nil then			
+				self.hook:update()
+				self.spd = {x=0, y=0}
+				return 
+			end
+
+			self:update_hitbox()
+
 			if not (btn(0) or btn(1) or btn(2) or btn(3)) then
 				self.spd.x = self.spd.x * .9
 				self.spd.y = self.spd.y * .9
 			end
 
 			if btn(k_left) then
+				self.facing = "left"
 				self.spd.x = .5
 				self.dir.x = -1
+				self.cast_dir = {x=-1, y=0}
 				self.k_raft = 9
 				self.k_player = 6
 				self.flip = {x=true, y=false}
 			end
 
 			if btn(k_right) then
+				self.facing = "right"
 				self.spd.x = .5
 				self.dir.x = 1
+				self.cast_dir = {x=1, y=0}
 				self.k_raft = 9
 				self.k_player = 6
 				self.flip = {x = false, y = false}
 			end
 
 			if btn(k_up) then
+				self.facing = "up"
 				self.spd.y = .5
 				self.dir.y = -1
+				self.cast_dir = {x=0, y=-1}
 				self.k_raft = 7
 				self.k_player = 5
 				self.flip = {x = false, y = false}
 			end
 
 			if btn(k_down) then
+				self.facing = "down"
 				self.spd.y = .5
 				self.dir.y = 1
+				self.cast_dir = {x=0, y=1}
 				self.k_raft = 7
 				self.k_player = 4
 				self.flip = {x = false, y = true}
 			end
-
-			self:update_hitbox()
 
 			-- debug = "x: " .. self.dir.x .. ", y: " .. self.dir.y
 
@@ -191,10 +265,11 @@ function create_player(x, y)
 		end,
 
         draw = function(self)
-			palt(0, false)
-			palt(11, true)
 			-- draw raft
             spr(self.k_raft, self.x, self.y, 2, 2, self.flip.x, self.flip.y)
+
+			palt(0, false)
+			palt(11, true)
 
 			-- draw player
 			local px = self.x + self.hitbox.w / 2 - 4
@@ -203,6 +278,11 @@ function create_player(x, y)
 
 			palt(0, true)
 			palt(11, false)
+
+			-- draw hook
+			if self.casting then
+				self.hook:draw()
+			end
 
 			-- draw hitbox (debug)
 			if debug_hitbox then
@@ -258,7 +338,7 @@ states = {
 	state = nil,
 	start = {
 		_update = function()
-			if (btn(5)) start_game()
+			if (btn(k_X)) start_game()
 		end,
 		_draw = function()
 			cls(1)
@@ -270,6 +350,14 @@ states = {
 	game = {
 		_update = function()
 			player:update()
+
+			if btnp(k_O) then
+				if player.casting then
+					player:retrieve()
+				else
+					player:cast()
+				end
+			end
 
 			for wave in all(waves) do
 				wave:update()
@@ -327,26 +415,26 @@ end
 function _init()
 	states:update_state(states.start)
 	load_room()
-	music(0)
+	-- music(0)
 end
 
 __gfx__
-00000000ccccccccffffffffccccccccbbbbbbbbbbbbbbbbbbbbbbbb445f44544454bbbbf4444f44444ff4440000000000000000000000000000000000000000
-00000000ccccccccffffffffccccccccbb0000bbbb0000bbbb006bbb4f5f44544f54bbbbff4f444f4f4444f40000000000000000000000000000000000000000
-00700700ccccccccffffffffccccccccbb6006bbbb0000bbbb0009bb4454f454f45fbbbb55555555555555550000000000000000000000000000000000000000
-00077000ccccccccffffffffccccccccbb0990bbbb0000bbbb000bbbf454f454f45fbbbbff4444ff444444ff0000000000000000000000000000000000000000
-00077000ccccccccffffffffccccccccb000000bb000000bbb007bbbf45444544454bbbbf444ff444f44ff440000000000000000000000000000000000000000
-00700700ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb445444544454bbbbff444444444444440000000000000000000000000000000000000000
-00000000ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb4f54f454f45fbbbb55555555555555550000000000000000000000000000000000000000
-00000000ccccccccffffffffccccccccbb9779bbbb9009bbbb009bbb44544454f45fbbbbff444444444444440000000000000000000000000000000000000000
-00000000cccccccccccccccccccc11cc3cccc3cc00000000000000004f5f44544f54bbbbf444ff44ff44ff440000000000000000000000000000000000000000
-00000000cccccccccccccccccc11661ccbccbccc0000000000000000445f44544f54bbbbff4444ff444444f40000000000000000000000000000000000000000
-00000000ccc6c6ccccccccccc166661cc3ccc3cc0000000000000000f454f454f45fbbbb55555555555555550000000000000000000000000000000000000000
-00000000cc6c6ccccccccccc1dd66661ccbcccbc00000000000000004454f454f454bbbbf4444f44ff44ff440000000000000000000000000000000000000000
-00000000cccccccccc6cc6cc15dd6661ccc3c39c00000000000000004f5444544454bbbbbbbbbbbbbbbbbbbb0000000000000000000000000000000000000000
-00000000ccccccccc6c66ccc155dddd1ccbc9ccc0000000000000000445444544454bbbbbbbbbbbbbbbbbbbb0000000000000000000000000000000000000000
-00000000cccccccccccccccc15555551ccc3cccc00000000000000004f5f4f5f4f54bbbbbbbbbbbbbbbbbbbb0000000000000000000000000000000000000000
-00000000ccccccccccccccccccccccccccc9cccc0000000000000000ff5fff5fff5fbbbbbbbbbbbbbbbbbbbb0000000000000000000000000000000000000000
+00000000ccccccccffffffffccccccccbbbbbbbbbbbbbbbbbbbbbbbb445f445444540000f4444f44444ff4440000000000000000000000000000000000000000
+00000000ccccccccffffffffccccccccbb0000bbbb0000bbbb006bbb4f5f44544f540000ff4f444f4f4444f40000000000000000000000000000000000000000
+00700700ccccccccffffffffccccccccbb6006bbbb0000bbbb0009bb4454f454f45f000055555555555555550000d00000011000000000000000000000000000
+00077000ccccccccffffffffccccccccbb0990bbbb0000bbbb000bbbf454f454f45f0000ff4444ff444444ff0000d00000111100000000000000000000000000
+00077000ccccccccffffffffccccccccb000000bb000000bbb007bbbf454445444540000f444ff444f44ff4400d0d00000111100000000000000000000000000
+00700700ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb4454445444540000ff44444444444444000d000000011000000000000000000000000000
+00000000ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb4f54f454f45f000055555555555555550000000000000000000000000000000000000000
+00000000ccccccccffffffffccccccccbb9779bbbb9009bbbb009bbb44544454f45f0000ff444444444444440000000000000000000000000000000000000000
+00000000cccccccccccccccccccc11cc3cccc3cc00000000000000004f5f44544f540000f444ff44ff44ff440000000000000000000000000000000000000000
+00000000cccccccccccccccccc11661ccbccbccc0000000000000000445f44544f540000ff4444ff444444f40000000000000000000000000000000000000000
+00000000ccc6c6ccccccccccc166661cc3ccc3cc0000000000000000f454f454f45f000055555555555555550000000000000000000000000000000000000000
+00000000cc6c6ccccccccccc1dd66661ccbcccbc00000000000000004454f454f4540000f4444f44ff44ff440000000000000000000000000000000000000000
+00000000cccccccccc6cc6cc15dd6661ccc3c39c00000000000000004f5444544454000000000000000000000000000000000000000000000000000000000000
+00000000ccccccccc6c66ccc155dddd1ccbc9ccc0000000000000000445444544454000000000000000000000000000000000000000000000000000000000000
+00000000cccccccccccccccc15555551ccc3cccc00000000000000004f5f4f5f4f54000000000000000000000000000000000000000000000000000000000000
+00000000ccccccccccccccccccccccccccc9cccc0000000000000000ff5fff5fff5f000000000000000000000000000000000000000000000000000000000000
 __gff__
 0000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
