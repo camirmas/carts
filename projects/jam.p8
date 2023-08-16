@@ -110,6 +110,38 @@ function create_waves()
 	end
 end
 
+function create_splash(x, y)
+	local wait_frames = 30 * 2.5
+	local dr = .4
+	local r_max = 6
+
+	local splash = {
+		x = x,
+		y = y,
+		r = 0,
+		wait_time = 0,
+
+		update = function(self)
+			if (self.r == r_max) then 
+				self.r = 0
+				self.wait_time = wait_frames
+			elseif self.wait_time > 0 then
+				self.wait_time = self.wait_time - 1	
+			else
+				self.r = min(self.r + dr, r_max)
+			end
+		end,
+
+		draw = function(self)
+			if self.wait_time == 0 then
+				circ(self.x, self.y, self.r, 7)
+			end
+		end,
+	}
+
+	return splash
+end
+
 function create_hook(start, dir)
 	local hook = {
 		start = start,
@@ -118,6 +150,7 @@ function create_hook(start, dir)
 		dir = dir,
 		z = 15,
 		k = k_hook,
+		splash = nil,
 
 		update = function(self)
 			local z = self.z - g
@@ -127,11 +160,18 @@ function create_hook(start, dir)
 				self.x = self.x + 1.5 * self.dir.x
 				self.y = self.y + 1.5 * self.dir.y
 			else
+				if self.splash == nil then
+					self.splash = create_splash(self.x, self.y)
+				else
+					self.splash:update()
+				end
+
 				-- check fishing
 			end
 		end,
 
 		draw = function(self)
+			-- draw fishing line
 			line(self.start.x, self.start.y, self.x, self.y, 10)
 
 			local xo, yo
@@ -145,7 +185,18 @@ function create_hook(start, dir)
 				xo = -4	
 				yo = -4	
 			end
-			spr(self.k, self.x + xo, self.y + yo, 1, 1, self.dir.x == 1, self.dir.y == -1)
+
+
+			if self.splash == nil then
+				-- draw hook
+				spr(self.k, self.x + xo, self.y + yo, 1, 1, self.dir.x == 1, self.dir.y == -1)
+			else
+				-- draw shadow
+				spr(12, self.x + xo, self.y + yo)
+
+				-- draw splash
+				if (self.splash ~= nil) self.splash:draw()
+			end
 		end
 	}
 
@@ -299,11 +350,11 @@ function create_player(x, y)
             spr(self.k_raft, self.x, self.y, 2, 2, self.flip.x, self.flip.y)
 
 			if self.casting then
-				-- draw rod
-				line(self.rod_start.x, self.rod_start.y, self.rod_end.x, self.rod_end.y, 2)
-
 				-- draw hook
 				self.hook:draw()
+
+				-- draw rod
+				line(self.rod_start.x, self.rod_start.y, self.rod_end.x, self.rod_end.y, 2)
 			end
 
 			palt(0, false)
