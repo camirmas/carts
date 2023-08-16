@@ -110,11 +110,11 @@ function create_waves()
 	end
 end
 
-function create_hook(x, y, dir)
+function create_hook(start, dir)
 	local hook = {
-		start = {x=x, y=y},
-		x = x,
-		y = y,		
+		start = start,
+		x = start.x,
+		y = start.y,		
 		dir = dir,
 		z = 15,
 		k = k_hook,
@@ -135,17 +135,17 @@ function create_hook(x, y, dir)
 			line(self.start.x, self.start.y, self.x, self.y, 10)
 
 			local xo, yo
-			if dir.x == 1 then
+			if self.dir.x == 1 then
 				xo = -3	
 				yo = -2	
-			elseif dir.x == -1 then
+			elseif self.dir.x == -1 then
 				xo = -4	
 				yo = -2	
 			else
 				xo = -4	
 				yo = -4	
 			end
-			spr(self.k, self.x + xo, self.y + yo, 1, 1, dir.x == 1, dir.y == -1)
+			spr(self.k, self.x + xo, self.y + yo, 1, 1, self.dir.x == 1, self.dir.y == -1)
 		end
 	}
 
@@ -159,8 +159,10 @@ function create_player(x, y)
 		spd = {x=0, y=0},
 		acc = {x=0, y=0},
 		dir = {x=0, y=0},
-		cast_dir = {x=0, y=-1},
+		cast_dir = {x=0, y=1},
         hitbox = {x=0, y=0, w=12, h=16},
+		rod_start = {x=0, y=0},
+		rod_end = {x=0, y=0},
 		k_player = 4,
 		k_raft = 7,
 		flip = {x=false, y=true}, -- initially facing down right
@@ -168,6 +170,13 @@ function create_player(x, y)
 		hook = nil,
 		casting = false,
 		retrieving = false,
+
+		get_spr_location = function(self)
+			local px = self.x + self.hitbox.w / 2 - 4
+			local py = self.y + self.hitbox.h / 2 - 4
+
+			return {x=px, y=py}
+		end,
 
 		update_hitbox = function(self)
 			if self.k_raft == 9 then
@@ -193,9 +202,34 @@ function create_player(x, y)
 		
 		cast = function(self)
 			self.casting = true
-			local px = self.x + self.hitbox.w / 2 - 4
-			local py = self.y + self.hitbox.h / 2 - 4
-			self.hook = create_hook(px, py, self.cast_dir)
+
+			local rod_length = 8
+
+			local p = self:get_spr_location()
+			local rod_start, rod_end
+
+			-- right
+			if self.cast_dir.x == 1 and self.cast_dir.y == 0 then
+				rod_start = {x = p.x + 4, y = p.y + 3}
+				rod_end = {x = rod_start.x + 3, y = p.y - 4}
+			--left 
+			elseif self.cast_dir.x == -1 and self.cast_dir.y == 0 then
+				rod_start = {x = p.x + 2, y = p.y + 3}
+				rod_end = {x = rod_start.x - 3, y = p.y - 4}
+			-- up
+			elseif self.cast_dir.x == 0 and self.cast_dir.y == -1 then
+				rod_start = {x = p.x + 1, y = p.y + 3}
+				rod_end = {x = rod_start.x, y = rod_start.y - rod_length}
+			-- down
+			elseif self.cast_dir.x == 0 and self.cast_dir.y == 1 then
+				rod_start = {x = p.x + 6, y = p.y + 5}
+				rod_end = {x = rod_start.x, y = rod_start.y + rod_length}
+			end
+
+			self.rod_start = rod_start
+			self.rod_end = rod_end
+
+			self.hook = create_hook(self.rod_end, self.cast_dir)
 		end,
 
 		retrieve = function(self)
@@ -220,7 +254,6 @@ function create_player(x, y)
 			end
 
 			if btn(k_left) then
-				self.facing = "left"
 				self.spd.x = .5
 				self.dir.x = -1
 				self.cast_dir = {x=-1, y=0}
@@ -230,7 +263,6 @@ function create_player(x, y)
 			end
 
 			if btn(k_right) then
-				self.facing = "right"
 				self.spd.x = .5
 				self.dir.x = 1
 				self.cast_dir = {x=1, y=0}
@@ -240,7 +272,6 @@ function create_player(x, y)
 			end
 
 			if btn(k_up) then
-				self.facing = "up"
 				self.spd.y = .5
 				self.dir.y = -1
 				self.cast_dir = {x=0, y=-1}
@@ -250,7 +281,6 @@ function create_player(x, y)
 			end
 
 			if btn(k_down) then
-				self.facing = "down"
 				self.spd.y = .5
 				self.dir.y = 1
 				self.cast_dir = {x=0, y=1}
@@ -268,21 +298,24 @@ function create_player(x, y)
 			-- draw raft
             spr(self.k_raft, self.x, self.y, 2, 2, self.flip.x, self.flip.y)
 
+			if self.casting then
+				-- draw rod
+				line(self.rod_start.x, self.rod_start.y, self.rod_end.x, self.rod_end.y, 2)
+
+				-- draw hook
+				self.hook:draw()
+			end
+
 			palt(0, false)
 			palt(11, true)
 
 			-- draw player
-			local px = self.x + self.hitbox.w / 2 - 4
-			local py = self.y + self.hitbox.h / 2 - 4
-            spr(self.k_player, px, py, 1, 1, self.flip.x, false)
+			local p = self:get_spr_location()
+            spr(self.k_player, p.x, p.y, 1, 1, self.flip.x, false)
 
 			palt(0, true)
 			palt(11, false)
 
-			-- draw hook
-			if self.casting then
-				self.hook:draw()
-			end
 
 			-- draw hitbox (debug)
 			if debug_hitbox then
