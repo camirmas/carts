@@ -13,12 +13,15 @@ k_O = 4
 k_X = 5
 k_rock = 19
 k_hook = 11 -- soon to have more
+k_alert = 33
 
 g = 1 -- gravity
 
 n_waves = 10
 n_waves_max = 30
 n_fishing_spots = 5
+
+t_bite_max = 5 * 30 -- max sec to wait before a bite
 
 fishing_spots = {}
 waves = {}
@@ -52,7 +55,6 @@ function magnitude(x, y)
 end
 
 function create_boat_particles(spd)
-	-- debug = "speed: " .. spd
 	local x, y
 	local vx, vy
 	if player.cast_dir.x == 1 then
@@ -116,19 +118,39 @@ function create_fishing_spots()
 	for i=1,n_fishing_spots do
 		x = flr(rnd(128))
 		y = flr(rnd(128))
+		local lifetime = rnd(30 * 20)
 
 		local spot = {
 			x = x,
 			y = y,
 			hitbox = {x=-8, y=-8, w=16, h=16},
-			lifetime = rnd(30 * 20), -- sec @ 30fps
-			t = 0, -- time alive
+			t = lifetime, -- time remaining
+			t_bite = 0,
+			bite = false,
 			bubbles = {},
 
-			update = function(self)
-				self.t = self.t + 1
+			set_hook = function(self, hook)
+				self.bite = false
+				self.hook = hook
+				self.t_bite = min(rnd(t_bite_max), self.t)
+			end,
 
-				if (self.t >= self.lifetime) del(fishing_spots, self)
+			update = function(self)
+				self.t = self.t - 1
+
+				if self.hook ~= nil then
+					if self.t_bite > 0 then
+						self.t_bite = self.t_bite - 1
+					elseif not self.hook.bite then
+						self.hook.bite = true
+						self.hook.bite_start = time()
+					end
+				end
+
+				if (self.t <= 0) then
+					self.hook = nil
+					del(fishing_spots, self)
+				end
 
 				for bubble in all(self.bubbles) do
 					bubble:update()
@@ -250,7 +272,34 @@ function create_hook(start, dir)
 		z = 15,
 		k = k_hook,
 		splash = nil,
-		in_spot = false,
+		spot = nil,
+		bite_start = nil,
+		bite = false,
+		caught = nil,
+
+		retrieve = function(self)
+			if self.bite then
+				-- check fish catch
+				local dt = time() - self.bite_start
+
+				if dt < .34 then
+					if rnd() > .5 then
+						self.caught = "rare"
+					else
+						self.caught = "common"
+					end
+				elseif dt < .68 then
+					self.caught = "common"
+				else
+					self.bite = false
+					self.spot:set_hook(self)
+				end
+
+				self.bite = false
+			end
+
+			self.spot = nil
+		end,
 
 		update = function(self)
 			local z = self.z - g
@@ -274,19 +323,37 @@ function create_hook(start, dir)
 
 				if (self.dir.x ~= dx) self.x = self.x + dx
 				if (self.dir.y ~= dy) self.y = self.y + dy
-
-				-- check if within a fishing spot
-
-				for spot in all(fishing_spots) do
-					if self:collide(spot, 0, 0) then
-						self.in_spot = true
-					end
-				end
 			else
 				if self.splash == nil then
 					self.splash = create_splash(self.x, self.y)
 				else
 					self.splash:update()
+				end
+
+				-- check if within a fishing spot
+				local spot_found
+				for spot in all(fishing_spots) do
+					if self:collide(spot, 0, 0) then
+						spot_found = spot
+					end
+				end
+
+				if spot_found ~= nil then
+					if self.spot == nil then
+						self.spot = spot_found
+						self.spot:set_hook(self)
+					end
+				end
+
+				if self.bite then
+					local dt = time() - self.bite_start
+					-- debug = "dt: " .. dt
+
+					if dt > 0.68 then
+						debug = "Missed!"
+						self.bite = false
+						self.spot:set_hook(self)
+					end
 				end
 			end
 		end,
@@ -345,7 +412,7 @@ function create_player(x, y)
 		max_spd = 1,
 		hook = nil,
 		casting = false,
-		retrieving = false,
+		backpack = {},
 
 		get_spr_location = function(self)
 			local px = self.x + self.hitbox.w / 2 - 4
@@ -409,10 +476,14 @@ function create_player(x, y)
 		end,
 
 		retrieve = function(self)
+			self.hook:retrieve()
+			-- check fishing
+			if self.hook.caught then
+				add(self.backpack, self.hook.caught)
+			end
+
 			self.casting = false
 			self.hook = nil
-
-			-- check fishing
 		end,
 
 		update = function(self)
@@ -492,6 +563,10 @@ function create_player(x, y)
 			palt(0, true)
 			palt(11, false)
 
+			-- draw fishing bite alert
+			if self.hook ~= nil and self.hook.spot ~= nil and self.hook.bite then
+				spr(k_alert, p.x + 2, p.y - 4)
+			end
 
 			-- draw hitbox (debug)
 			draw_hitbox(self)
@@ -555,6 +630,8 @@ states = {
 	},
 	game = {
 		_update = function()
+			debug = ""
+
 			-- debug = "" .. #boat_particles
 			player:update()
 
@@ -606,6 +683,10 @@ states = {
 
 			player:draw()
 
+			if #player.backpack > 0 then
+				debug = "caught: " .. player.backpack[#player.backpack]
+			end
+
 			print(debug, (128-#debug*4)/2, 12*8)
 		end
 	},
@@ -653,12 +734,12 @@ __gfx__
 00000000ccccccccc6c66ccc155dddd1ccbc9ccc0000000000000000445444544454000000000000000000000001100000000000000000000000000000000000
 00000000cccccccccccccccc15555551ccc3cccc00000000000000004f5f4f5f4f54000000000000000000000000000000000000000000000000000000000000
 00000000ccccccccccccccccccccccccccc9cccc0000000000000000ff5fff5fff5f000000000000000000000000000000000000000000000000000000000000
-00000000555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000595000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-1c01cc70595000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01ccccdc595000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01cccccc555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-1c01ccc0595000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000555000000090090080900908000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000595000008080080880800808000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+1c01cc70595000008088880888888888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01ccccdc59500000088ee880008ee800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01cccccc555000008088880808888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+1c01ccc0595000000800008080800808000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __gff__
 0000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
