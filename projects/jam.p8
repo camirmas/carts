@@ -19,7 +19,6 @@ g = 1 -- gravity
 n_waves = 10
 n_waves_max = 30
 n_fishing_spots = 5
-n_boat_particles_max = 50
 
 fishing_spots = {}
 waves = {}
@@ -59,34 +58,32 @@ function create_boat_particles(spd)
 	if player.cast_dir.x == 1 then
 		x = player.x	
 		y = player.y + player.hitbox.y + rnd(player.hitbox.h)
-		vx = -.2 * rnd()
+		vx = -.3 * rnd()
 		vy = .2 * gauss_rng()
 	elseif player.cast_dir.x == -1 then
 		x = player.x + player.hitbox.x + player.hitbox.w
 		y = player.y + player.hitbox.y + rnd(player.hitbox.h)
-		vx = .2 * rnd()
+		vx = .3 * rnd()
 		vy = .2 * gauss_rng()
 	elseif player.cast_dir.y == 1 then
 		x = player.x + player.hitbox.x + rnd(player.hitbox.w)
 		y = player.y
 		vx = .2 * gauss_rng()
-		vy = -.2 * rnd()
+		vy = -.3 * rnd()
 	elseif player.cast_dir.y == -1 then
 		x = player.x + player.hitbox.x + rnd(player.hitbox.w)
 		y = player.y + player.hitbox.y + player.hitbox.h
 		vx = .2 * gauss_rng()
-		vy = .2 * rnd()
+		vy = .3 * rnd()
 	end
 
-	spd = min(spd, 1)
-
-	for i=1,spd*10 do
+	for i=1,5 do
 		local particle = {
 			x = x,
 			y = y,
 			vx = vx,
 			vy = vy,
-			lifetime = 1.5*30 + 15 * gauss_rng(),
+			lifetime = 1.5*30 + 10 * gauss_rng(),
 			t = 0, -- time alive
 
 			update = function(self)
@@ -558,6 +555,7 @@ states = {
 	},
 	game = {
 		_update = function()
+			-- debug = "" .. #boat_particles
 			player:update()
 
 			if btnp(k_O) then
