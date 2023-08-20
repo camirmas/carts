@@ -19,10 +19,12 @@ g = 1 -- gravity
 n_waves = 10
 n_waves_max = 30
 n_fishing_spots = 5
+n_boat_particles_max = 50
 
 fishing_spots = {}
 waves = {}
 objects = {}
+boat_particles = {}
 
 -- map regions
 regions = {
@@ -44,6 +46,73 @@ function gauss_rng()
         sum = sum + rnd(1)
     end
     return sum - 6
+end
+
+function magnitude(x, y)
+	return sqrt(x^2+y^2)
+end
+
+function create_boat_particles(spd)
+	-- debug = "speed: " .. spd
+	local x, y
+	local vx, vy
+	if player.cast_dir.x == 1 then
+		x = player.x	
+		y = player.y + player.hitbox.y + rnd(player.hitbox.h)
+		vx = -.2 * rnd()
+		vy = .2 * gauss_rng()
+	elseif player.cast_dir.x == -1 then
+		x = player.x + player.hitbox.x + player.hitbox.w
+		y = player.y + player.hitbox.y + rnd(player.hitbox.h)
+		vx = .2 * rnd()
+		vy = .2 * gauss_rng()
+	elseif player.cast_dir.y == 1 then
+		x = player.x + player.hitbox.x + rnd(player.hitbox.w)
+		y = player.y
+		vx = .2 * gauss_rng()
+		vy = -.2 * rnd()
+	elseif player.cast_dir.y == -1 then
+		x = player.x + player.hitbox.x + rnd(player.hitbox.w)
+		y = player.y + player.hitbox.y + player.hitbox.h
+		vx = .2 * gauss_rng()
+		vy = .2 * rnd()
+	end
+
+	spd = min(spd, 1)
+
+	for i=1,spd*10 do
+		local particle = {
+			x = x,
+			y = y,
+			vx = vx,
+			vy = vy,
+			lifetime = 1.5*30 + 15 * gauss_rng(),
+			t = 0, -- time alive
+
+			update = function(self)
+				self.t = self.t + 1
+
+				if self.t >= self.lifetime then
+					del(boat_particles, self)
+					return
+				end
+
+				if self.x ~= 0 then
+					self.x = self.x + self.vx
+					self.y = self.y + self.vy * cos(self.t)
+				elseif self.y ~= 0 then
+					self.x = self.x + self.vx * cos(self.t)
+					self.y = self.y + self.vy
+				end
+			end,
+
+			draw = function(self)
+				pset(self.x, self.y, 6)
+			end
+		}
+		
+		add(boat_particles, particle)
+	end
 end
 
 function create_fishing_spots()
@@ -264,18 +333,18 @@ end
 
 function create_player(x, y)
 	return {
-		x = x,
-		y = y,
-		spd = {x=0, y=0},
-		acc = {x=0, y=0},
-		dir = {x=0, y=0},
-		cast_dir = {x=0, y=1},
-        hitbox = {x=0, y=0, w=12, h=16},
+		x = x, -- raft x
+		y = y, -- raft y
+		spd = {x=0, y=0}, -- raft speed
+		acc = {x=0, y=0}, -- raft acceleration
+		dir = {x=0, y=0}, -- movement dir
+		cast_dir = {x=0, y=1}, -- casting dir (L/R/U/D)
+        hitbox = {x=0, y=0, w=12, h=16}, -- raft hitbox
 		rod_start = {x=0, y=0},
 		rod_end = {x=0, y=0},
 		k_player = 4,
 		k_raft = 7,
-		flip = {x=false, y=true}, -- initially facing down right
+		flip = {x=false, y=true}, -- initially facing down
 		max_spd = 1,
 		hook = nil,
 		casting = false,
@@ -507,8 +576,14 @@ states = {
 				spot:update()
 			end
 
+			for part in all(boat_particles) do
+				part:update()
+			end
+
 			if (#waves < n_waves_max) create_waves()
 			if (#fishing_spots < n_fishing_spots) create_fishing_spots()
+			local spd = magnitude(player.spd.x, player.spd.y)
+			if (spd > 0) create_boat_particles(spd)
 		end,
 		_draw = function()
 			cls()
@@ -516,6 +591,11 @@ states = {
 
 			for wave in all(waves) do
 				wave:draw()
+			end
+
+			-- draw boat particles
+			for part in all(boat_particles) do
+				part:draw()
 			end
 
 			for spot in all(fishing_spots) do
