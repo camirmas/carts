@@ -21,33 +21,76 @@ n_waves = 10
 n_waves_max = 30
 n_fishing_spots = 5
 
-t_bite_max = 5 * 30 -- max sec to wait before a bite
+time_to_bite_max = 5 * 30 -- max sec to wait before a bite
 
 fishing_spots = {}
 waves = {}
 objects = {}
 boat_particles = {}
 
+fish = {
+	sardine = {
+		k = 32,
+		rarity = "common",
+	},
+	salmon = {
+		k = 33,
+		rarity = "rare",
+	}
+}
+
+junk = {
+	metal = {
+		k = 37,
+	},
+	wood = {
+		k = 38,
+	}
+}
+
 -- map regions
 regions = {
-	start = 0,
+	start = {
+		fish = {fish.sardine, fish.salmon},
+		junk = {junk.metal, junk.wood}
+	},
 	island = 1,
 	ice = 2,
 	junk = 3
 }
 
--- fish
-fish = {
-	sardine = {
-		k = 32,
-		rarity = "common",
-		regions = {regions.start},
-	}
-}
+function get_region(x, y)
+    -- Define the quadrant boundaries
+    local half_width = 128 * 8 / 2
+    local half_height = 32 * 8 / 2
+    
+    -- Determine the quadrant based on x, y location
+    if x < half_width and y < half_height then
+		-- top left
+        return regions.start
+    elseif x >= half_width and y < half_height then
+		-- top right
+        return regions.island
+    elseif x < half_width and y >= half_height then
+		-- bottom left
+        return regions.ice
+    else
+		-- bottom right
+        return regions.junk
+    end
+end
+
+function sample(l)
+	return l[flr(rnd(#l)+1)]
+end
 
 function draw_hitbox(obj)
 	if debug_hitbox then
-		rect(obj.x + obj.hitbox.x, obj.y + obj.hitbox.y, obj.x + obj.hitbox.x + obj.hitbox.w, obj.y + obj.hitbox.y + obj.hitbox.h, 11)
+		rect(
+			obj.x + obj.hitbox.x, obj.y + obj.hitbox.y, 
+			obj.x + obj.hitbox.x + obj.hitbox.w, obj.y + obj.hitbox.y + obj.hitbox.h,
+			11
+		)
 	end
 end
 
@@ -98,7 +141,7 @@ function create_boat_particles(spd)
 			t = 0, -- time alive
 
 			update = function(self)
-				self.t = self.t + 1
+				self.t += 1
 
 				if self.t >= self.lifetime then
 					del(boat_particles, self)
@@ -106,11 +149,11 @@ function create_boat_particles(spd)
 				end
 
 				if self.x ~= 0 then
-					self.x = self.x + self.vx
-					self.y = self.y + self.vy * cos(self.t)
+					self.x += self.vx
+					self.y += self.vy * cos(self.t)
 				elseif self.y ~= 0 then
-					self.x = self.x + self.vx * cos(self.t)
-					self.y = self.y + self.vy
+					self.x += self.vx * cos(self.t)
+					self.y += self.vy
 				end
 			end,
 
@@ -120,89 +163,6 @@ function create_boat_particles(spd)
 		}
 		
 		add(boat_particles, particle)
-	end
-end
-
-function create_fishing_spots()
-	for i=1,n_fishing_spots do
-		x = flr(rnd(128))
-		y = flr(rnd(128))
-		local lifetime = rnd(30 * 20)
-
-		local spot = {
-			x = x,
-			y = y,
-			hitbox = {x=-8, y=-8, w=16, h=16},
-			t = lifetime, -- time remaining
-			t_bite = 0,
-			bite = false,
-			bubbles = {},
-
-			set_hook = function(self, hook)
-				self.bite = false
-				self.hook = hook
-				self.t_bite = min(rnd(t_bite_max), self.t)
-			end,
-
-			update = function(self)
-				self.t = self.t - 1
-
-				if self.hook ~= nil then
-					if self.t_bite > 0 then
-						self.t_bite = self.t_bite - 1
-					elseif not (self.hook.bite or self.hook.caught) then
-						sfx(3)
-						self.hook.bite = true
-						self.hook.bite_start = time()
-					end
-				end
-
-				if (self.t <= 0) then
-					self.hook = nil
-					del(fishing_spots, self)
-				end
-
-				for bubble in all(self.bubbles) do
-					bubble:update()
-				end
-			end,
-
-			draw = function(self)
-				for bubble in all(self.bubbles) do
-					bubble:draw()
-				end
-
-				draw_hitbox(self)
-			end
-		}
-		local n_bubbles = max(3, flr(rnd(6)))
-		for i=1,n_bubbles do
-			local bubble = {
-				x = spot.x + 2 * gauss_rng(),
-				y = spot.y + 2 * gauss_rng(),
-				r_max = max(2, 2.7 * gauss_rng()),
-				dr = .1,
-				r = 0,
-
-				update = function(self)
-					local nr = self.r + self.dr
-
-					if nr >= self.r_max then
-						self.r = 0
-						self.r_max = max(2, 2.7 * gauss_rng())
-					else
-						self.r = nr
-					end
-				end,
-
-				draw = function(self)
-					circ(self.x, self.y, self.r, 1)
-				end
-			}
-			add(spot.bubbles, bubble)
-		end
-
-		add(fishing_spots, spot)
 	end
 end
 
@@ -217,7 +177,7 @@ function create_waves()
 			t = 0, -- time alive
 
 			update = function(self)
-				self.t = self.t + 1
+				self.t += 1
 
 				if (self.t >= self.lifetime) del(waves, self)
 			end,
@@ -246,7 +206,7 @@ function create_splash(x, y)
 				self.r = 0
 				self.wait_time = wait_frames
 			elseif self.wait_time > 0 then
-				self.wait_time = self.wait_time - 1	
+				self.wait_time -= 1
 			else
 				self.r = min(self.r + dr, r_max)
 			end
@@ -260,6 +220,148 @@ function create_splash(x, y)
 	}
 
 	return splash
+end
+
+
+function create_fishing_spot(x, y, is_junk)
+	x = x or flr(rnd(128))
+	y = y or flr(rnd(128))
+	local lifetime = rnd(30 * 20)
+
+	local spot = {
+		x = x,
+		y = y,
+		region = get_region(x, y),
+		hitbox = {x=-8, y=-8, w=16, h=16},
+		t = lifetime, -- time remaining
+		time_to_bite = 0, -- time until bite
+		is_junk = is_junk, -- is this a junk spot
+		bite = false,
+		bite_start = nil, -- when the bite started
+		bubbles = {},
+
+		set_hook = function(self, hook)
+			self.bite = false
+			if (hook ~= nil) self.hook = hook
+			self.time_to_bite = min(rnd(time_to_bite_max), self.t)
+		end,
+
+		check_catch = function(self)
+			local dt = time() - self.bite_start
+
+			if self.is_junk then
+				-- check junk catch
+				if 	dt < .68 then
+					local j = sample(self.region.junk)
+					return j
+				end
+
+				-- no matter what, we delete the junk spot
+				del(fishing_spots, self)
+			else
+				-- check fish catch
+				local f
+				if dt < .34 then
+					-- extra roll for rare
+					if rnd() > .5 then
+						-- rare
+						f = sample(self.region.fish)
+					else
+						-- common
+						f = sample(self.region.fish)
+					end
+				elseif dt < .68 then
+					-- common
+					f = sample(self.region.fish)
+				else
+					-- missed, start new bite countdown
+					self:set_hook()
+				end
+
+				return f
+			end
+		end,
+
+		update = function(self)
+			self.t -= 1
+
+			if self.hook ~= nil then
+				if self.time_to_bite > 0 then
+					self.time_to_bite -= 1
+				elseif not (self.bite or self.hook.caught) then
+					sfx(3)
+					self.bite = true
+					self.bite_start = time()
+				end
+			end
+
+			if (self.t <= 0) then
+				self.hook = nil
+				del(fishing_spots, self)
+			end
+
+			for bubble in all(self.bubbles) do
+				bubble:update()
+			end
+
+			if self.bite then
+				local dt = time() - self.bite_start
+				-- debug = "dt: " .. dt
+
+				if dt >= 0.68 then
+					debug = "Missed!"
+					self.bite = false
+					self:set_hook()
+				end
+			end
+		end,
+
+		draw = function(self)
+			for bubble in all(self.bubbles) do
+				bubble:draw()
+			end
+
+			draw_hitbox(self)
+		end
+	}
+
+	-- don't go further and make bubbles if fishing for junk
+	if (is_junk) return spot
+
+	local n_bubbles = max(3, flr(rnd(6)))
+	for i=1,n_bubbles do
+		local bubble = {
+			x = spot.x + 2 * gauss_rng(),
+			y = spot.y + 2 * gauss_rng(),
+			r_max = max(2, 2.7 * gauss_rng()),
+			dr = .1,
+			r = 0,
+
+			update = function(self)
+				local nr = self.r + self.dr
+
+				if nr >= self.r_max then
+					self.r = 0
+					self.r_max = max(2, 2.7 * gauss_rng())
+				else
+					self.r = nr
+				end
+			end,
+
+			draw = function(self)
+				circ(self.x, self.y, self.r, 1)
+			end
+		}
+		add(spot.bubbles, bubble)
+	end
+
+	add(fishing_spots, spot)
+end
+
+function create_fishing_spots()
+	for i=1,n_fishing_spots do
+		create_fishing_spot()	
+	end
 end
 
 function create_hook(start, dir)
@@ -283,33 +385,15 @@ function create_hook(start, dir)
 		k = k_hook,
 		splash = nil,
 		spot = nil,
-		bite_start = nil,
-		bite = false,
 		caught = nil,
 
 		retrieve = function(self)
-			if self.bite then
-				-- check fish catch
-				local dt = time() - self.bite_start
+			if self.spot.bite then
+				local fish = self.spot:check_catch()
 
-				if dt < .34 then
-					-- extra roll for rare
-					if rnd() > .5 then
-						-- rare
-						self.caught = fish.sardine
-					else
-						-- common
-						self.caught = fish.sardine
-					end
-				elseif dt < .68 then
-					-- common
-					self.caught = fish.sardine
-				else
-					self.bite = false
-					self.spot:set_hook(self)
+				if fish ~= nil then
+					self.caught = fish
 				end
-
-				self.bite = false
 			end
 
 			self.spot = nil
@@ -322,8 +406,8 @@ function create_hook(start, dir)
 				-- apply physics
 
 				self.z = z
-				self.x = self.x + 1.5 * self.dir.x
-				self.y = self.y + 1.5 * self.dir.y
+				self.x += 1.5 * self.dir.x
+				self.y += 1.5 * self.dir.y
 
 				-- apply user control for rod
 
@@ -335,8 +419,8 @@ function create_hook(start, dir)
 				if (btn(k_down)) dy = 1
 				if (btn(k_up)) dy = -1
 
-				if (self.dir.x ~= dx) self.x = self.x + dx
-				if (self.dir.y ~= dy) self.y = self.y + dy
+				if (self.dir.x ~= dx) self.x += dx
+				if (self.dir.y ~= dy) self.y += dy
 			else
 				if self.splash == nil then
 					sfx(6)	
@@ -353,23 +437,18 @@ function create_hook(start, dir)
 					end
 				end
 
-				if spot_found ~= nil then
+				if spot_found == nil then
+					-- fish for junk
+					self.spot = create_fishing_spot(self.x, self.y, true)
+					add(fishing_spots, self.spot)
+					self.spot:set_hook(self)
+				else
 					if self.spot == nil then
 						self.spot = spot_found
 						self.spot:set_hook(self)
 					end
 				end
 
-				if self.bite then
-					local dt = time() - self.bite_start
-					-- debug = "dt: " .. dt
-
-					if dt > 0.68 then
-						debug = "Missed!"
-						self.bite = false
-						self.spot:set_hook(self)
-					end
-				end
 			end
 		end,
 
@@ -568,7 +647,7 @@ function create_player(x, y)
 			player:move(self.dir.x * self.spd.x, self.dir.y * self.spd.y)
 
 			if self.info_timer > 0 then
-				self.info_timer = self.info_timer - 1
+				self.info_timer -= 1
 			end
 		end,
 
@@ -594,14 +673,14 @@ function create_player(x, y)
 			palt(0, true)
 			palt(11, false)
 
-			-- draw fishing bite alert
-			if self.hook ~= nil and self.hook.spot ~= nil and self.hook.bite then
-				spr(k_alert, p.x + 2, p.y - 6)
-			end
-
 			-- draw info spr
 			if self.info_spr ~= nil and self.info_timer > 0 then
 				spr(self.info_spr, p.x + 2, p.y - 6)
+			end
+
+			-- draw fishing bite alert
+			if self.hook ~= nil and self.hook.spot ~= nil and self.hook.spot.bite then
+				spr(k_alert, p.x + 2, p.y - 6)
 			end
 
 			-- draw hitbox (debug)
@@ -627,8 +706,8 @@ function create_obs(x, y, k)
         k = k,
         hitbox = {x=0, y=0, w=8, h=8},
         move = function(self, dx, dy)
-            self.x = self.x + dx
-            self.y = self.y + dy
+            self.x += dx
+            self.y += dy
         end,
         draw = function(self)
             spr(self.k, self.x, self.y)
@@ -766,12 +845,14 @@ __gfx__
 00000000ccccccccc6c66ccc155dddd1ccbc9ccc5950000000000000445444544454000000000000000000000001100000000000000000000000000000000000
 00000000cccccccccccccccc15555551ccc3cccc55500000000000004f5f4f5f4f54000000000000000000000000000000000000000000000000000000000000
 00000000ccccccccccccccccccccccccccc9cccc0000000000000000ff5fff5fff5f000000000000000000000000000000000000000000000000000000000000
-00000000000000000090090080900908000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000008080080880800808000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-1d01dd70000000008088880888888888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01dddddd00000000088ee880008ee800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01dddddd000000008088880808888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-1d01ddd0000000000800008080800808000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+1000000000000000009009008090090800000000d500000045000000b3000000555555555555500005aa90005555555500000000000000000000000000000000
+01170000000000008080080880800808000000006d500000f4500000fb30000054464445564650005aaaa9005d7777d500000000000000000000000000000000
+011100001101179080888808888888880000000006d500000f4500000fb3000054444645544450005aaaa900d1dccd1d00000000000000000000000000000000
+10000000d1111771088ee880008ee80000000000006d500000f4500000fb3000564646455464500005aa90005deeeed500000000000000000000000000000000
+00000000011111118088880808888880000000000006d500000f4500000fb3005646444555555000000000005555555500000000000000000000000000000000
+0000000011d1111d08000080808008080000000000006d500000f4500000fb305646464500000000000000000000000000000000000000000000000000000000
+00000000dd0dddd0000000000000000000000000000007d500000f4500000fb35644444500000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000007d000000f4000000fb5555555500000000000000000000000000000000000000000000000000000000
 __gff__
 0000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -798,8 +879,9 @@ __sfx__
 711200000000500005000150002500015000251001510025100151002510015100251001510025000050000515015150250001500025000150002510015100251001510025100151002510015100250000500000
 49010000057550a7550c7550f7551375516755187551d7551f70500705267052e7053570500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005
 490300001044514445184251d42521425134051140510405104050d4050c405004050040500405004050040500405004050040500405004050040500405004050040500405004050040500405004050040500405
-4a0400002d61032610386103b6103e6102160021600216003c6003c6003c6003c6003c6003b600006000060000600006000060000600006000060000600006000060000600006000060000600006000060000600
+4b0400002d61032610386103b6103e6102160021600216003c6003c6003c6003c6003c6003b600006000060000600006000060000600006000060000600006000060000600006000060000600006000060000600
 00020000090210a0210d0210f02111021140211802100001000010000100001000010000100001000010000100001000010000100001000010000100001000010000100001000010000100001000010000100001
+4a0200000161003610066100d610166101d61023610296102f61033610376102f6003460036600006000060000600006000060000600006000060000600006000060000600006000060000600006000060000600
 __music__
 03 00010244
 
