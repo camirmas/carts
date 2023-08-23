@@ -23,18 +23,26 @@ n_fishing_spots = 5
 
 time_to_bite_max = 5 * 30 -- max sec to wait before a bite
 
+missed = 0
+
 fishing_spots = {}
 waves = {}
 objects = {}
 boat_particles = {}
 
+backpack_open = false
+
 fish = {
-	sardine = {
-		k = 32,
+	bass = {
+		name = "bass",
+		k = 44,
+		t_col = 12, -- transparency color
 		rarity = "common",
 	},
 	salmon = {
-		k = 33,
+		name = "salmon",
+		k = 12,
+		t_col = 11, -- transparency color
 		rarity = "rare",
 	}
 }
@@ -42,16 +50,18 @@ fish = {
 junk = {
 	metal = {
 		k = 37,
+		is_junk = true
 	},
 	wood = {
 		k = 38,
+		is_junk = true
 	}
 }
 
 -- map regions
 regions = {
 	start = {
-		fish = {fish.sardine, fish.salmon},
+		fish = {fish.bass, fish.salmon},
 		junk = {junk.metal, junk.wood}
 	},
 	island = 1,
@@ -247,39 +257,49 @@ function create_fishing_spot(x, y, is_junk)
 		end,
 
 		check_catch = function(self)
+			if (not self.bite) return
+
 			local dt = time() - self.bite_start
 
 			if self.is_junk then
 				-- check junk catch
+				local j
 				if 	dt < .68 then
-					local j = sample(self.region.junk)
-					return j
+					j = sample(self.region.junk)
+				else
+					missed += 1
 				end
 
-				-- no matter what, we delete the junk spot
+				self.bite = false
+				-- no matter what, delete the junk spot (is this necessary?)
 				del(fishing_spots, self)
-			else
-				-- check fish catch
-				local f
-				if dt < .34 then
-					-- extra roll for rare
-					if rnd() > .5 then
-						-- rare
-						f = sample(self.region.fish)
-					else
-						-- common
-						f = sample(self.region.fish)
-					end
-				elseif dt < .68 then
-					-- common
+
+				return j
+			end
+
+			-- check fish catch
+			local f
+			if dt < .34 then
+				-- extra roll for rare
+				if rnd() > .5 then
+					-- rare
 					f = sample(self.region.fish)
 				else
-					-- missed, start new bite countdown
-					self:set_hook()
+					-- common
+					f = sample(self.region.fish)
 				end
-
-				return f
+			elseif dt < .68 then
+				-- common
+				f = sample(self.region.fish)
+			else
+				-- missed
+				missed += 1
 			end
+
+			self.bite = false
+			del(fishing_spots, self)
+
+			return f
 		end,
 
 		update = function(self)
@@ -288,7 +308,7 @@ function create_fishing_spot(x, y, is_junk)
 			if self.hook ~= nil then
 				if self.time_to_bite > 0 then
 					self.time_to_bite -= 1
-				elseif not (self.bite or self.hook.caught) then
+				elseif not (self.bite or self.hook.caught ~= nil) then
 					sfx(3)
 					self.bite = true
 					self.bite_start = time()
@@ -309,7 +329,7 @@ function create_fishing_spot(x, y, is_junk)
 				-- debug = "dt: " .. dt
 
 				if dt >= 0.68 then
-					debug = "Missed!"
+					missed += 1
 					self.bite = false
 					self:set_hook()
 				end
@@ -388,11 +408,11 @@ function create_hook(start, dir)
 		caught = nil,
 
 		retrieve = function(self)
-			if self.spot.bite then
-				local fish = self.spot:check_catch()
+			if self.spot and self.spot.bite then
+				local f = self.spot:check_catch()
 
 				if fish ~= nil then
-					self.caught = fish
+					self.caught = f
 				end
 			end
 
@@ -489,6 +509,58 @@ function create_hook(start, dir)
 	return hook
 end
 
+function create_backpack()
+	local held_junk = {}
+	local held_fish = {}
+
+	for k, f in pairs(junk) do
+		held_junk[k] = { quantity = 0 }
+	end
+
+	for k, f in pairs(fish) do
+		held_fish[k] = { quantity = 0 }
+	end
+
+	local backpack = {
+		junk = held_junk,
+		fish = held_fish,
+
+		add = function(self, i, qty)
+			if (i.is_junk) then 
+				self:add_junk(i, qty)
+			else
+				self:add_fish(i, qty)
+			end
+		end,
+
+		add_junk = function(self, j, qty)
+			if self.junk[j] then
+				self.junk[j].quantity = self.junk[j].quantity + qty
+			end
+		end,
+
+		rm_junk = function(self, j, qty)
+			if self.junk[j] and self.junk[j].quantity - qty >= 0 then
+				self.junk[j].quantity = self.junk[j].quantity - qty
+			end
+		end,
+
+		add_fish = function(self, f, qty)
+			if self.fish[f] then
+				self.fish[f].quantity = self.fish[f].quantity + qty
+			end
+		end,
+
+		rm_fish = function(self, f, qty)
+			if self.fish[f] and self.fish[f].quantity - qty >= 0 then
+				self.fish[f].quantity = self.fish[f].quantity - qty
+			end
+		end,
+	}
+
+	return backpack
+end
+
 function create_player(x, y)
 	return {
 		x = x, -- raft x
@@ -506,9 +578,9 @@ function create_player(x, y)
 		max_spd = 1,
 		hook = nil,
 		casting = false,
-		backpack = {},
+		backpack = create_backpack(),
 		info_timer = 0,
-		info_spr = nil,
+		info_caught = nil,
 
 		get_spr_location = function(self)
 			local px = self.x + self.hitbox.w / 2 - 4
@@ -574,7 +646,7 @@ function create_player(x, y)
 		end,
 
 		set_info_timer = function(self)
-			self.info_spr = self.hook.caught.k
+			self.info_caught = self.hook.caught
 			self.info_timer = 2.5 * 30 -- 2.5s @ 30fps
 		end,
 
@@ -583,8 +655,8 @@ function create_player(x, y)
 			-- check fishing
 			if self.hook.caught then
 				self:set_info_timer()
-				self.hook.caught = false
-				add(self.backpack, self.hook.caught)
+				self.backpack:add(self.hook.caught.name, 1)
+				self.hook.caught = nil
 				sfx(4)
 			end
 
@@ -674,8 +746,16 @@ function create_player(x, y)
 			palt(11, false)
 
 			-- draw info spr
-			if self.info_spr ~= nil and self.info_timer > 0 then
-				spr(self.info_spr, p.x + 2, p.y - 6)
+			if self.info_caught ~= nil and self.info_timer > 0 then
+				-- fish are 2x2
+				local l = 2
+				if (self.info_caught.is_junk) l = 1
+
+				palt(0, false)
+				palt(self.info_caught.t_col, true)
+				spr(self.info_caught.k, p.x + 2, p.y - 6, l, l)
+				palt(0, true)
+				palt(self.info_caught.t_col, false)
 			end
 
 			-- draw fishing bite alert
@@ -725,6 +805,44 @@ function create_rock(x, y)
     return r
 end
 
+function open_backpack()
+	local x0 = 2*8+4
+	local y0 = 2*8+4
+	local x1 = 13*8-4
+	local y1 = 13*8-4
+
+	-- background
+	rectfill(2*8, 2*8, 13*8, 13*8, 4)
+	rectfill(x0, y0, x1, y1, 15)
+	
+	-- title
+	local title = "backpack"
+	print(title, x0 + 2, y0 + 2, 0)
+
+	-- draw fish
+	local disp_x0 = x0 + 2
+	local disp_y0 = y0 + 8
+	local disp_x1 = x1 - 2
+	local disp_y1 = y1 - 2
+
+	rect(disp_x0, disp_y0, disp_x1, disp_y1, 3)
+
+	local cx = disp_x0 + 1
+	local cy = disp_y0 + 1
+
+	for k, f in pairs(fish) do
+		palt(0, false)
+		palt(f.t_col, true)
+		spr(f.k, cx, cy, 2, 2)
+		palt(0, true)
+		palt(f.t_col, false)
+
+		local qty = player.backpack.fish[k].quantity
+		print(k .. " x " .. qty, cx + 20, cy + 4, 0)
+		cy += 20
+	end
+end
+
 function start_game()
 	states:update_state(states.game)
 	player = create_player(20, 20)
@@ -746,6 +864,13 @@ states = {
 	game = {
 		_update = function()
 			debug = ""
+
+			if btnp(k_X) then
+				backpack_open = not backpack_open
+				return
+			end
+
+			if (backpack_open) return
 
 			-- debug = "" .. #boat_particles
 			player:update()
@@ -798,7 +923,11 @@ states = {
 
 			player:draw()
 
+			debug = "missed: " .. missed
+
 			print(debug, (128-#debug*4)/2, 12*8)
+
+			if (backpack_open) open_backpack()
 		end
 	},
 	update_state = function(self, s)
@@ -829,30 +958,38 @@ function _init()
 end
 
 __gfx__
-00000000ccccccccffffffffccccccccbbbbbbbbbbbbbbbbbbbbbbbb445f445444540000f4444f44444ff4448800000000000000000000000000000000000000
-00000000ccccccccffffffffccccccccbb0000bbbb0000bbbb006bbb4f5f44544f540000ff4f444f4f4444f48800000000000000000000000000000000000000
-00700700ccccccccffffffffccccccccbb6006bbbb0000bbbb0009bb4454f454f45f000055555555555555557700000000000000000000000000000000000000
-00077000ccccccccffffffffccccccccbb0990bbbb0000bbbb000bbbf454f454f45f0000ff4444ff444444ff0000000000000000000000000000000000000000
-00077000ccccccccffffffffccccccccb000000bb000000bbb007bbbf454445444540000f444ff444f44ff440000000000000000000000000000000000000000
-00700700ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb4454445444540000ff444444444444440000000000000000000000000000000000000000
-00000000ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb4f54f454f45f000055555555555555550000000000000000000000000000000000000000
-00000000ccccccccffffffffccccccccbb9779bbbb9009bbbb009bbb44544454f45f0000ff444444444444440000000000000000000000000000000000000000
-00000000cccccccccccccccccccc11cc3cccc3cc55500000000000004f5f44544f540000f444ff44ff44ff440000000000000000000000000000000000000000
-00000000cccccccccccccccccc11661ccbccbccc5950000000000000445f44544f540000ff4444ff444444f40000000000000000000000000000000000000000
-00000000ccc6c6ccccccccccc166661cc3ccc3cc5950000000000000f454f454f45f000055555555555555550001100000000000000000000000000000000000
-00000000cc6c6ccccccccccc1dd66661ccbcccbc59500000000000004454f454f4540000f4444f44ff44ff440011110000000000000000000000000000000000
-00000000cccccccccc6cc6cc15dd6661ccc3c39c55500000000000004f5444544454000000000000000000000011110000000000000000000000000000000000
-00000000ccccccccc6c66ccc155dddd1ccbc9ccc5950000000000000445444544454000000000000000000000001100000000000000000000000000000000000
-00000000cccccccccccccccc15555551ccc3cccc55500000000000004f5f4f5f4f54000000000000000000000000000000000000000000000000000000000000
-00000000ccccccccccccccccccccccccccc9cccc0000000000000000ff5fff5fff5f000000000000000000000000000000000000000000000000000000000000
-1000000000000000009009008090090800000000d500000045000000b3000000555555555555500005aa90005555555500000000000000000000000000000000
-01170000000000008080080880800808000000006d500000f4500000fb30000054464445564650005aaaa9005d7777d500000000000000000000000000000000
-011100001101179080888808888888880000000006d500000f4500000fb3000054444645544450005aaaa900d1dccd1d00000000000000000000000000000000
-10000000d1111771088ee880008ee80000000000006d500000f4500000fb3000564646455464500005aa90005deeeed500000000000000000000000000000000
-00000000011111118088880808888880000000000006d500000f4500000fb3005646444555555000000000005555555500000000000000000000000000000000
-0000000011d1111d08000080808008080000000000006d500000f4500000fb305646464500000000000000000000000000000000000000000000000000000000
-00000000dd0dddd0000000000000000000000000000007d500000f4500000fb35644444500000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000007d000000f4000000fb5555555500000000000000000000000000000000000000000000000000000000
+00000000ccccccccffffffffccccccccbbbbbbbbbbbbbbbbbbbbbbbb445f445444540000f4444f44444ff44488000000bbbbbbbbbb1111bb0000000000000000
+00000000ccccccccffffffffccccccccbb0000bbbb0000bbbb006bbb4f5f44544f540000ff4f444f4f4444f488000000bbbbbbbb11dc6dbb0000000000000000
+00700700ccccccccffffffffccccccccbb6006bbbb0000bbbb0009bb4454f454f45f0000555555555555555577000000bbbbbbb11da06ddb0000000000000000
+00077000ccccccccffffffffccccccccbb0990bbbb0000bbbb000bbbf454f454f45f0000ff4444ff444444ff00000000bbbb1111dc6a6cdb0000000000000000
+00077000ccccccccffffffffccccccccb000000bb000000bbb007bbbf454445444540000f444ff444f44ff4400000000bbb1cd1dc6666c1b0000000000000000
+00700700ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb4454445444540000ff4444444444444400000000bbbb1d1c667661bb0000000000000000
+00000000ccccccccffffffffccccccccbb0770bbbb0000bbbb007bbb4f54f454f45f0000555555555555555500000000bbbbb1166776c1bb0000000000000000
+00000000ccccccccffffffffccccccccbb9779bbbb9009bbbb009bbb44544454f45f0000ff4444444444444400000000bbbbb1d677661bbb0000000000000000
+00000000cccccccccccccccccccc11cc3cccc3cc55500000000000004f5f44544f540000f444ff44ff44ff4400000000bbbb1d677661bbbb0000000000000000
+00000000cccccccccccccccccc11661ccbccbccc5950000000000000445f44544f540000ff4444ff444444f400000000bbbb1c666c11bbbb0000000000000000
+00000000ccc6c6ccccccccccc166661cc3ccc3cc5950000000000000f454f454f45f0000555555555555555500011000bbb1d67c11c1bbbb0000000000000000
+00000000cc6c6ccccccccccc1dd66661ccbcccbc59500000000000004454f454f4540000f4444f44ff44ff4400111100b11d6611bb1bbbbb0000000000000000
+00000000cccccccccc6cc6cc15dd6661ccc3c39c55500000000000004f5444544454000000000000000000000011110016cdd1bbbbbbbbbb0000000000000000
+00000000ccccccccc6c66ccc155dddd1ccbc9ccc59500000000000004454445444540000000000000000000000011000b1dc1bbbbbbbbbbb0000000000000000
+00000000cccccccccccccccc15555551ccc3cccc55500000000000004f5f4f5f4f540000000000000000000000000000bb161bbbbbbbbbbb0000000000000000
+00000000ccccccccccccccccccccccccccc9cccc0000000000000000ff5fff5fff5f0000000000000000000000000000bbb1bbbbbbbbbbbb0000000000000000
+0000000000000000009009008090090800000000d500000045000000b3000000555555555555500005aa900055555555ccccccccc44666cc0000000000000000
+00000000000000008080080880800808000000006d500000f4500000fb30000054464445564650005aaaa9005d7777d5cccccccc44bff6cc0000000000000000
+000000000000000080888808888888880000000006d500000f4500000fb3000054444645544450005aaaa900d1dccd1dcccccccc4a0bf6cc0000000000000000
+0000000000000000088ee880008ee80000000000006d500000f4500000fb3000564646455464500005aa90005deeeed5cccccc34bbabb3cc0000000000000000
+00000000000000008088880808888880000000000006d500000f4500000fb30056464445555550000000000055555555ccccf34bbbbb63cc0000000000000000
+000000000000000008000080808008080000000000006d500000f4500000fb3056464645000000000000000000000000ccf3bf4b3bb63ccc0000000000000000
+0000000000000000000000000000000000000000000007d500000f4500000fb356444445000000000000000000000000cc3f34b3b3f63ccc0000000000000000
+00000000000000000000000000000000000000000000007d000000f4000000fb55555555000000000000000000000000ccc3f4b33f63cccc0000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000cccc4bbbff63cccc0000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000cccc4bbff63ccccc0000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ccc4bbf663cccccc0000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000cc46bf633ccccccc0000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003dd3663b3ccccccc0000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000db3d3cc3cccccccc0000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c3bdcccccccccccc0000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ccd3cccccccccccc0000000000000000
 __gff__
 0000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
