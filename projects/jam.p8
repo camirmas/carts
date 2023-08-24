@@ -38,23 +38,29 @@ fish = {
 		k = 44,
 		t_col = 12, -- transparency color
 		rarity = "common",
+		dim = 2 -- 2x2
 	},
 	salmon = {
 		name = "salmon",
 		k = 12,
 		t_col = 11, -- transparency color
 		rarity = "rare",
+		dim = 2 -- 2x2
 	}
 }
 
 junk = {
 	metal = {
+		name = "metal",
 		k = 37,
-		is_junk = true
+		is_junk = true,
+		dim = 1 -- 1x1
 	},
 	wood = {
+		name = "metal",
 		k = 38,
-		is_junk = true
+		is_junk = true,
+		dim = 1 -- 1x1
 	}
 }
 
@@ -249,6 +255,8 @@ function create_fishing_spot(x, y, is_junk)
 		bite = false,
 		bite_start = nil, -- when the bite started
 		bubbles = {},
+		to_delete = false,
+		hook = nil,
 
 		set_hook = function(self, hook)
 			self.bite = false
@@ -267,12 +275,10 @@ function create_fishing_spot(x, y, is_junk)
 				if 	dt < .68 then
 					j = sample(self.region.junk)
 				else
-					missed += 1
+					self.hook:missed()
 				end
 
-				self.bite = false
-				-- no matter what, delete the junk spot (is this necessary?)
-				del(fishing_spots, self)
+				self.to_delete = true
 
 				return j
 			end
@@ -293,19 +299,33 @@ function create_fishing_spot(x, y, is_junk)
 				f = sample(self.region.fish)
 			else
 				-- missed
-				missed += 1
+				self.hook:missed()
 			end
-
-			self.bite = false
-			del(fishing_spots, self)
 
 			return f
 		end,
 
 		update = function(self)
+			if self.to_delete then
+				del(fishing_spots, self)
+				return 
+			end
+
 			self.t -= 1
 
-			if self.hook ~= nil then
+			-- always update bubbles
+			for bubble in all(self.bubbles) do
+				bubble:update()
+			end
+
+			-- check lifetime
+			if (self.t <= 0) then
+				self.to_delete = true
+				return
+			end
+
+			-- time to bite
+			if self.hook ~= nil and not self.bite then
 				if self.time_to_bite > 0 then
 					self.time_to_bite -= 1
 				elseif not (self.bite or self.hook.caught ~= nil) then
@@ -313,25 +333,14 @@ function create_fishing_spot(x, y, is_junk)
 					self.bite = true
 					self.bite_start = time()
 				end
-			end
-
-			if (self.t <= 0) then
-				self.hook = nil
-				del(fishing_spots, self)
-			end
-
-			for bubble in all(self.bubbles) do
-				bubble:update()
-			end
-
-			if self.bite then
+			-- time since bite
+			elseif self.bite then
 				local dt = time() - self.bite_start
 				-- debug = "dt: " .. dt
 
 				if dt >= 0.68 then
-					missed += 1
-					self.bite = false
-					self:set_hook()
+					self.hook:missed()
+					self.to_delete = true
 				end
 			end
 		end,
@@ -345,7 +354,7 @@ function create_fishing_spot(x, y, is_junk)
 		end
 	}
 
-	-- don't go further and make bubbles if fishing for junk
+	-- don't make bubbles if fishing for junk
 	if (is_junk) return spot
 
 	local n_bubbles = max(3, flr(rnd(6)))
@@ -407,6 +416,12 @@ function create_hook(start, dir)
 		spot = nil,
 		caught = nil,
 
+		missed = function(self)
+			if (self.spot == nil) return
+			missed += 1
+			self.spot = nil
+		end,
+
 		retrieve = function(self)
 			if self.spot and self.spot.bite then
 				local f = self.spot:check_catch()
@@ -449,26 +464,26 @@ function create_hook(start, dir)
 					self.splash:update()
 				end
 
-				-- check if within a fishing spot
-				local spot_found
-				for spot in all(fishing_spots) do
-					if self:collide(spot, 0, 0) then
-						spot_found = spot
+				if self.spot == nil then
+					-- check if within a fishing spot
+					local spot_found
+					for spot in all(fishing_spots) do
+						if self:collide(spot, 0, 0) then
+							spot_found = spot
+						end
 					end
-				end
 
-				if spot_found == nil then
-					-- fish for junk
-					self.spot = create_fishing_spot(self.x, self.y, true)
-					add(fishing_spots, self.spot)
-					self.spot:set_hook(self)
-				else
-					if self.spot == nil then
+					if spot_found == nil then
+						-- fish for junk
+						local spot = create_fishing_spot(self.x, self.y, true)
+						add(fishing_spots, spot)
+						self.spot = spot
+						self.spot:set_hook(self)
+					else
 						self.spot = spot_found
 						self.spot:set_hook(self)
 					end
 				end
-
 			end
 		end,
 
@@ -647,7 +662,7 @@ function create_player(x, y)
 
 		set_info_timer = function(self)
 			self.info_caught = self.hook.caught
-			self.info_timer = 2.5 * 30 -- 2.5s @ 30fps
+			self.info_timer = 2 * 30 -- 2.5s @ 30fps
 		end,
 
 		retrieve = function(self)
@@ -724,6 +739,8 @@ function create_player(x, y)
 		end,
 
         draw = function(self)
+			palt(0, true)
+
 			-- draw raft
             spr(self.k_raft, self.x, self.y, 2, 2, self.flip.x, self.flip.y)
 
@@ -745,22 +762,19 @@ function create_player(x, y)
 			palt(0, true)
 			palt(11, false)
 
-			-- draw info spr
-			if self.info_caught ~= nil and self.info_timer > 0 then
-				-- fish are 2x2
-				local l = 2
-				if (self.info_caught.is_junk) l = 1
-
-				palt(0, false)
-				palt(self.info_caught.t_col, true)
-				spr(self.info_caught.k, p.x + 2, p.y - 6, l, l)
-				palt(0, true)
-				palt(self.info_caught.t_col, false)
-			end
-
 			-- draw fishing bite alert
 			if self.hook ~= nil and self.hook.spot ~= nil and self.hook.spot.bite then
 				spr(k_alert, p.x + 2, p.y - 6)
+			-- draw fish/junk caught
+			elseif self.info_caught ~= nil and self.info_timer > 0 then
+				-- fish are 2x2
+
+				palt(0, false)
+				palt(self.info_caught.t_col, true)
+				local dim = self.info_caught.dim
+				spr(self.info_caught.k, p.x + 2, p.y - 6, dim, dim)
+				palt(0, true)
+				palt(self.info_caught.t_col, false)
 			end
 
 			-- draw hitbox (debug)
@@ -838,7 +852,7 @@ function open_backpack()
 		palt(f.t_col, false)
 
 		local qty = player.backpack.fish[k].quantity
-		print(k .. " x " .. qty, cx + 20, cy + 4, 0)
+		print(k .. " X " .. qty, cx + 20, cy + 4, 0)
 		cy += 20
 	end
 end
