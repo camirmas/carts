@@ -229,8 +229,8 @@ function create_waves()
 	for i=1,n_waves do
 		local k = rnd() > .5 and 17 or 18
 		local wave = {
-			x = flr(rnd(128)),
-			y = flr(rnd(128)),
+			x = cam.x + flr(rnd(128)),
+			y = cam.y + flr(rnd(128)),
 			k = k,
 			lifetime = rnd(30 * 2), -- sec @ 30fps
 			t = 0, -- time alive
@@ -238,7 +238,13 @@ function create_waves()
 			update = function(self)
 				self.t += 1
 
-				if (self.t >= self.lifetime) del(waves, self)
+				if (self.t >= self.lifetime or 
+				    self.x < cam.x or 
+				    self.x > cam.x + 128 or 
+				    self.y < cam.y or 
+				    self.y > cam.y + 128) then
+					del(waves, self)
+				end
 			end,
 
 			draw = function(self)
@@ -893,6 +899,7 @@ end
 function start_game()
 	states:update_state(states.game)
 	player = create_player(20, 20)
+	cam = {x=0, y=0}
 	backpack_ui = create_backpack_ui()
 
 	for _, f in pairs(fish) do 
@@ -984,7 +991,7 @@ function create_backpack_ui()
 		end,
 
 		-- draw based on camera view
-		draw = function(self, cam)
+		draw = function(self)
 			local page = {}
 
 			w = 14*8
@@ -1104,6 +1111,12 @@ states = {
 				end
 			end
 
+			-- update camera based on player loc
+			cam = {
+				x = mid(0, player.x - 63 + 4, 16*8-1),
+				y = mid(0, player.y - 63 + 4, 16*8-1)
+			}
+
 			for wave in all(waves) do
 				wave:update()
 			end
@@ -1116,6 +1129,7 @@ states = {
 				part:update()
 			end
 
+			debug = "" .. #waves
 			if (#waves < n_waves_max) create_waves()
 			if (#fishing_spots < n_fishing_spots) create_fishing_spots()
 			local spd = magnitude(player.spd.x, player.spd.y)
@@ -1125,12 +1139,7 @@ states = {
 			cls()
 			map()
 
-			local c = {
-				x = mid(0, player.x - 63 + 4, 16*8-1),
-				y = mid(0, player.y - 63 + 4, 16*8-1)
-			}
-
-			camera(c.x, c.y)
+			camera(cam.x, cam.y)
 
 			for wave in all(waves) do
 				wave:draw()
@@ -1151,7 +1160,7 @@ states = {
 
 			player:draw()
 
-			if (backpack_ui.enabled) backpack_ui:draw(c)
+			if (backpack_ui.enabled) backpack_ui:draw()
 
 			-- debug = "missed: " .. missed
 
