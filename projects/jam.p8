@@ -84,19 +84,22 @@ items = {
 		dim = 1,
 	},
 	sm_box = {
-		name = "sm. box",
+		name = "sm_box",
+		disp_name = "sm. box",
 		k = 41,
 		type = item_types.item,
 		dim = 1
 	},
 	lg_box = {
-		name = "lg. box",
+		name = "lg_box",
+		disp_name = "lg. box",
 		k = 40,
 		type = item_types.item,
 		dim = 1
 	},
-	coin = {
-		name = "shiny coin",
+	shiny_coin = {
+		name = "shiny_coin",
+		disp_name = "shiny coin",
 		k = 42,
 		type = item_types.item,
 		dim = 1
@@ -300,7 +303,7 @@ function create_fishing_spot(x, y, is_junk)
 		set_hook = function(self, hook)
 			self.bite = false
 			if (hook ~= nil) self.hook = hook
-			self.time_to_bite = min(rnd(time_to_bite_max), self.t)
+			self.time_to_bite = mid(1*30, rnd(time_to_bite_max), self.t)
 		end,
 
 		check_catch = function(self)
@@ -566,24 +569,33 @@ end
 function create_backpack()
 	local held_junk = {}
 	local held_fish = {}
+	local held_items = {}
 
-	for k, f in pairs(junk) do
+	for k, v in pairs(junk) do
 		held_junk[k] = { quantity = 0 }
 	end
 
-	for k, f in pairs(fish) do
+	for k, v in pairs(fish) do
 		held_fish[k] = { quantity = 0 }
+	end
+
+	for k, v in pairs(items) do
+		held_items[k] = { quantity = 0 }
 	end
 
 	local backpack = {
 		qty_fish = 0,
 		qty_junk = 0,
+		qty_items = 0,
 		junk = held_junk,
 		fish = held_fish,
+		items = held_items,
 
 		add = function(self, i, qty)
 			if (i.type == item_types.junk) then 
 				self:add_junk(i.name, qty)
+			elseif (i.type == item_types.item) then
+				self:add_item(i.name, qty)
 			else
 				self:add_fish(i.name, qty)
 			end
@@ -614,6 +626,20 @@ function create_backpack()
 			if self.fish[f] and self.fish[f].quantity - qty >= 0 then
 				self.fish[f].quantity = self.fish[f].quantity - qty
 				self.qty_fish -= qty
+			end
+		end,
+
+		add_item = function(self, i, qty)
+			if self.items[i] then
+				self.items[i].quantity = self.items[i].quantity + qty
+				self.qty_items += qty
+			end
+		end,
+
+		rm_item = function(self, i, qty)
+			if self.items[i] and self.items[i].quantity - qty >= 0 then
+				self.items[i].quantity = self.items[i].quantity - qty
+				self.qty_items -= qty
 			end
 		end,
 	}
@@ -813,7 +839,6 @@ function create_player(x, y)
 			-- draw fish/junk caught
 			elseif self.info_caught ~= nil and self.info_timer > 0 then
 				-- fish are 2x2
-
 				palt(0, false)
 				palt(self.info_caught.t_col, true)
 				local dim = self.info_caught.dim
@@ -868,11 +893,16 @@ function start_game()
 	states:update_state(states.game)
 	player = create_player(20, 20)
 	backpack_ui = create_backpack_ui()
-	player.backpack:add(fish.salmon, 1)
-	player.backpack:add(fish.bass, 1)
-	player.backpack:add(junk.metal, 1)
-	player.backpack:add(junk.wood, 1)
-	player.backpack:add(junk.bamboo, 1)
+
+	for _, f in pairs(fish) do 
+		player.backpack:add(f, 1) 
+	end
+	for _, j in pairs(junk) do 
+		player.backpack:add(j, 1) 
+	end
+	for _, i in pairs(items) do
+		player.backpack:add(i, 1)
+	end
 end
 
 function create_backpack_ui()
@@ -896,14 +926,14 @@ function create_backpack_ui()
 				local qty = info.quantity
 
 				if qty > 0 then
-					add(page, {f, qty})
-					n_items += 1
-
 					if n_items == 4 then
 						n_items = 0
 						add(pages, page)
 						page = {}
 					end
+
+					add(page, {f, qty})
+					n_items += 1
 				end
 			end
 
@@ -912,14 +942,30 @@ function create_backpack_ui()
 				local qty = info.quantity
 
 				if qty > 0 then
-					add(page, {j, qty})
-					n_items += 1
-
 					if n_items == 4 then
 						n_items = 0
 						add(pages, page)
 						page = {}
 					end
+
+					add(page, {j, qty})
+					n_items += 1
+				end
+			end
+
+			for name, info in pairs(player.backpack.items) do
+				local i = items[name]
+				local qty = info.quantity
+
+				if qty > 0 then
+					if n_items == 4 then
+						n_items = 0
+						add(pages, page)
+						page = {}
+					end
+
+					add(page, {i, qty})
+					n_items += 1
 				end
 			end
 
@@ -973,9 +1019,9 @@ function create_backpack_ui()
 				local item = res[1]
 				local qty = res[2]
 
-				print(item.name .. " X " .. qty, cx + 20, cy + 4, 0)
+				print((item.disp_name or item.name) .. " X " .. qty, cx + 20, cy + 4, 0)
 
-				if (item.type == item_types.junk) then
+				if (item.type ~= item_types.fish) then
 					spr(item.k, cx + 4, cy + 3, item.dim, item.dim)
 					cy += 16
 				else
