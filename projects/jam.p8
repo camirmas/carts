@@ -238,6 +238,7 @@ function create_waves()
 			update = function(self)
 				self.t += 1
 
+				-- remove waves that are outside the camera view
 				if (self.t >= self.lifetime or 
 				    self.x < cam.x or 
 				    self.x > cam.x + 128 or 
@@ -289,8 +290,8 @@ end
 
 
 function create_fishing_spot(x, y, is_junk)
-	x = x or flr(rnd(128))
-	y = y or flr(rnd(128))
+	x = x or (cam.x + flr(rnd(128)))
+	y = y or (cam.y + flr(rnd(128)))
 	local lifetime = rnd(30 * 20)
 
 	local spot = {
@@ -367,8 +368,12 @@ function create_fishing_spot(x, y, is_junk)
 				bubble:update()
 			end
 
-			-- check lifetime
-			if (self.t <= 0) then
+			-- remove spots that are outside the camera view
+			if (self.t <= 0 or 
+				self.x < cam.x or 
+				self.x > cam.x + 128 or 
+				self.y < cam.y or 
+				self.y > cam.y + 128) then
 				self.to_delete = true
 				return
 			end
@@ -1129,7 +1134,7 @@ states = {
 				part:update()
 			end
 
-			debug = "" .. #waves
+			debug = "" .. #fishing_spots
 			if (#waves < n_waves_max) create_waves()
 			if (#fishing_spots < n_fishing_spots) create_fishing_spots()
 			local spd = magnitude(player.spd.x, player.spd.y)
