@@ -106,7 +106,7 @@ items = {
 		k = 41,
 		type = item_types.item,
 		dim = 1,
-		components = {
+		junk = {
 			wood = 5,
 			metal = 2,
 		},
@@ -121,7 +121,7 @@ items = {
 		k = 40,
 		type = item_types.item,
 		dim = 1,
-		components = {
+		junk = {
 			wood = 8,
 			metal = 4,
 		},
@@ -271,7 +271,7 @@ function create_trader()
 			craftable = function(self)
 				if (not self.item) return
 
-				for name, qty in pairs(self.item.components) do
+				for name, qty in pairs(self.item.junk) do
 					local p_qty = player.backpack.junk[name].quantity
 					if (p_qty < qty) return false
 				end
@@ -313,7 +313,7 @@ function create_trader()
 
 				cy += 12
 
-				for name, qty in pairs(self.item.components) do
+				for name, qty in pairs(self.item.junk) do
 					local p_qty = player.backpack.junk[name].quantity
 					local j = junk[name]
 					spr(j.k, cx, cy)
@@ -1002,8 +1002,8 @@ function create_player(x, y)
 				end
 			end
 
-			self.x = self.x + dx
-			self.y = self.y + dy
+			self.x += dx
+			self.y += dy
 		end,
 		
 		cast = function(self)
@@ -1208,17 +1208,62 @@ end
 
 function create_ice_block(x, y)
     local r = create_obs(x, y, k_ice_block)
-    r.hitbox = {x=1, y=4, w=7, h=4}
+    r.hitbox = {x=0, y=3, w=7, h=4}
 
-    return
+    return r
+end
+
+function create_map_bounds()
+	local top = {
+		x = 0,
+		y = -8,
+		hitbox = {x=0, y=0, w=128*8, h=8},
+
+		draw = function(self)
+			draw_hitbox(self)
+		end
+	}
+	local right = {
+		x = 128*8 - 1,
+		y = 0,
+		hitbox = {x=0, y=0, w=8, h=64*8},
+
+		draw = function(self)
+			draw_hitbox(self)
+		end
+	}
+	local bottom = {
+		x = 0,
+		y = 64*8-1,
+		hitbox = {x=0, y=0, w=128*8, h=8},
+
+		draw = function(self)
+			draw_hitbox(self)
+		end
+	}
+	local left = {
+		x = -8,
+		y = 0,
+		hitbox = {x=0, y=0, w=8, h=64*8},
+
+		draw = function(self)
+			draw_hitbox(self)
+		end
+	}
+
+	add(objects, top)
+	add(objects, right)
+	add(objects, bottom)
+	add(objects, left)
 end
 
 function start_game()
 	states:update_state(states.game)
-	player = create_player(20, 16 * 8)
+	player = create_player(2*8, 56 * 8)
 	cam = {x=0, y=0}
 	trader = create_trader()
 	backpack_ui = create_backpack_ui()
+	create_map_bounds()
 
 	for _, f in pairs(fish) do 
 		player.backpack:add(f, 10) 
@@ -1440,8 +1485,8 @@ states = {
 
 			-- update camera based on player loc
 			cam = {
-				x = mid(0, player.x - 63 + 4, 128*8-1),
-				y = mid(0, player.y - 63 + 4, 32*8-1)
+				x = mid(0, player.x - 64 + 6, 128*8-128),
+				y = mid(0, player.y - 64 + 6, 64*8-128)
 			}
 
 			for wave in all(waves) do
@@ -1516,7 +1561,6 @@ function contains(table, element)
 end
 
 function load_map()
-    -- TODO: load objects based on camera view
     for x=1,128 do
         for y=1,64 do
             local tile = mget(x, y)
