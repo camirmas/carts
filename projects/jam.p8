@@ -260,8 +260,8 @@ function create_trader()
 			end,
 
 			select = function(self)
-				if self.selected == 1 and self:craftable() then
-					-- craft
+				if self.selected == 1 then
+					self:craft()
 				else
 					-- exit
 					self:close()
@@ -284,6 +284,27 @@ function create_trader()
 				return true
 			end,
 
+			craft = function(self)
+				if (not self:craftable()) return
+
+				for name, qty in pairs(self.item.junk) do
+					local j = junk[name]
+					player.backpack:rm(j, qty)
+				end
+
+				for name, qty in pairs(self.item.fish) do
+					local f = fish[name]
+					player.backpack:rm(f, qty)
+				end
+
+				for name, qty in pairs(self.item.items) do
+					local i = items[name]
+					player.backpack:rm(i, qty)
+				end
+
+				player.backpack:add(self.item, 1)
+			end,
+
 			update = function(self)
 				if btn(k_right) and self.selected == 1 then
 					self.selected = 2
@@ -304,8 +325,9 @@ function create_trader()
 				local cy = r[2] + 4
 
 				local name = self.item.disp_name or self.item.name
+				local p_qty = player.backpack.items[self.item.name].quantity
 				draw_item(self.item, cx, cy)
-				print(name .. " X " .. 1, cx + 20, cy + 2, 0)
+				print(name .. " X " .. p_qty, cx + 20, cy + 2, 0)
 
 				cy += 12
 
@@ -912,6 +934,16 @@ function create_backpack()
 			end
 		end,
 
+		rm = function(self, i, qty)
+			if (i.type == item_types.junk) then 
+				self:rm_junk(i.name, qty)
+			elseif (i.type == item_types.item) then
+				self:rm_item(i.name, qty)
+			else
+				self:rm_fish(i.name, qty)
+			end
+		end,
+
 		add_junk = function(self, j, qty)
 			if self.junk[j] then
 				self.junk[j].quantity = self.junk[j].quantity + qty
@@ -1259,7 +1291,7 @@ end
 
 function start_game()
 	states:update_state(states.game)
-	player = create_player(2*8, 56 * 8)
+	player = create_player(3*8, 16 * 8)
 	cam = {x=0, y=0}
 	trader = create_trader()
 	backpack_ui = create_backpack_ui()
