@@ -2,6 +2,8 @@ pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
 
+-- CONSTANTS
+
 debug = ""
 debug_hitbox = false
 
@@ -33,12 +35,13 @@ waves = {}
 objects = {}
 boat_particles = {}
 
+-- OBJECT DEFINITIONS
+
 item_types = {
 	fish = 1,
 	junk = 2,
 	item = 3,
 }
-
 
 fish = {
 	bass = {
@@ -79,18 +82,6 @@ junk = {
 		dim = 1
 	}
 }
-
-function draw_fish(fish, x, y)
-	palt(0, false)
-	palt(fish.t_col, true)
-	spr(fish.k, x, y, fish.dim, fish.dim)
-	palt(0, true)
-	palt(fish.t_col, false)
-end
-
-function draw_item(item, x, y)
-	spr(item.k, x + item.off.x, y + item.off.y)
-end
 
 items = {
 	cassette = {
@@ -160,6 +151,68 @@ regions = {
 	}
 }
 
+-- UTILITIES
+
+function contains(table, element)
+	for _, value in pairs(table) do
+		if value == element then
+			return true
+		end
+	end
+	return false
+end
+
+-- DIALOGUE
+
+function dtb_init()
+    dtb_q={}
+    dtb_p=1
+    dtb_qt=nil
+end
+
+function dtb_update()
+    if #dtb_q~=0 then
+        dtb_p+=1
+        if dtb_p>#dtb_qt then
+            dtb_p=#dtb_qt
+            if btnp(k_O) then
+                del(dtb_q,dtb_qt)
+            dtb_qt=dtb_q[1]
+                dtb_p=1
+            end
+        elseif btnp(k_O) then
+            dtb_p=#dtb_qt
+        end
+    end
+end
+
+function dtb_draw()
+    if dtb_qt~=nil then
+        rectfill(2,105,125,125,1)
+        print(sub(dtb_qt,1,dtb_p),4,107,7)
+        if dtb_p==#dtb_qt then
+            print("🅾️",117,119,13)
+        end
+    end
+end
+
+function dtb_disp(str)
+    add(dtb_q,str)
+    if (#dtb_q==1) dtb_qt=dtb_q[1]
+end
+
+function draw_fish(fish, x, y)
+	palt(0, false)
+	palt(fish.t_col, true)
+	spr(fish.k, x, y, fish.dim, fish.dim)
+	palt(0, true)
+	palt(fish.t_col, false)
+end
+
+function draw_item(item, x, y)
+	spr(item.k, x + item.off.x, y + item.off.y)
+end
+
 function get_region(x, y)
     -- Define the quadrant boundaries
     local half_width = 128 * 8 / 2
@@ -179,14 +232,6 @@ function get_region(x, y)
 		-- bottom right
         return regions.junk
     end
-end
-
-function add_arr(arr1, arr2)
-    local result = {}
-    for i = 1, #arr1 do
-        result[i] = arr1[i] + arr2[i]
-    end
-    return result
 end
 
 function sample(l)
@@ -215,191 +260,13 @@ function magnitude(x, y)
 	return sqrt(x^2+y^2)
 end
 
-function create_trader()
-	local w = 14 * 8
-	local h = 15 * 8
-	local bg = {2*8, 2*8, w, h}
-	local bp = {bg[1] + 4, bg[2] + 4, bg[3] - 4, bg[4] - 4}
-	local ilist = {bp[1] + 2, bp[2] + 8, bp[3] - 2, bp[4] - 2}
+-- OBJECT CREATION
 
+function create_trader()
 	local t = {
 		x = 0,
-		y = 16 * 8,
-		w = w,
-		h = h,
-		bg = bg, -- background rect
-		bp = bp, -- backpack overlay rect
-		ilist = ilist, -- item list rect
-
-		enter_zone = {
-			x = 0,
-			y = 16*8,
-			hitbox = {x = 0, y = -4, w = 20, h = 20}
-		},
+		y = 16*8,
 		hitbox = {x = 0, y = 0, w = 16, h = 12},
-		enabled = false,
-		selected = 1,
-		items = {
-			items.sm_box,
-			items.lg_box
-		},
-		submenu = {
-			selected = 1,
-			ilist = ilist,
-			enabled = false,
-			item = nil,
-
-			open = function(self, item)
-				self.enabled = true
-				self.item = item
-			end,
-
-			close = function(self)
-				self.enabled = false
-				self.item = nil
-			end,
-
-			select = function(self)
-				if self.selected == 1 then
-					self:craft()
-				else
-					-- exit
-					self:close()
-				end
-			end,
-
-			craftable = function(self)
-				if (not self.item) return
-
-				for name, qty in pairs(self.item.junk) do
-					local p_qty = player.backpack.junk[name].quantity
-					if (p_qty < qty) return false
-				end
-
-				for name, qty in pairs(self.item.fish) do
-					local f_qty = player.backpack.fish[name].quantity
-					if (f_qty < qty) return false
-				end
-			
-				return true
-			end,
-
-			craft = function(self)
-				if (not self:craftable()) return
-
-				for name, qty in pairs(self.item.junk) do
-					local j = junk[name]
-					player.backpack:rm(j, qty)
-				end
-
-				for name, qty in pairs(self.item.fish) do
-					local f = fish[name]
-					player.backpack:rm(f, qty)
-				end
-
-				for name, qty in pairs(self.item.items) do
-					local i = items[name]
-					player.backpack:rm(i, qty)
-				end
-
-				player.backpack:add(self.item, 1)
-			end,
-
-			update = function(self)
-				if btn(k_right) and self.selected == 1 then
-					self.selected = 2
-				elseif btn(k_left) and self.selected == 2 then
-					self.selected = 1	
-				end
-			end,
-
-			draw = function(self)
-				-- apply camera offsets
-				local r = add_arr({cam.x, cam.y, cam.x, cam.y}, self.ilist)
-				rectfill(r[1], r[2], r[3], r[4], 6)
-				rect(r[1], r[2], r[3], r[4], 3)
-
-				
-				local x_mid = flr(r[1] + (r[3]-r[1])/2)
-				local cx = r[1] + 4
-				local cy = r[2] + 4
-
-				local name = self.item.disp_name or self.item.name
-				local p_qty = player.backpack.items[self.item.name].quantity
-				draw_item(self.item, cx, cy)
-				print(name .. " X " .. p_qty, cx + 20, cy + 2, 0)
-
-				cy += 12
-
-				spr(57, x_mid - 4, cy, 1, 1, false, true)
-
-				cy += 12
-
-				for name, qty in pairs(self.item.junk) do
-					local p_qty = player.backpack.junk[name].quantity
-					local j = junk[name]
-					spr(j.k, cx, cy)
-					print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 2, 0)
-					cy += 14
-				end
-
-				for name, qty in pairs(self.item.fish) do
-					local p_qty = player.backpack.fish[name].quantity
-					local f = fish[name]
-					draw_fish(f, cx, cy)
-					print(f.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
-					cy += 16
-				end
-
-				local craftable = self:craftable()
-
-				local c = "craft"
-				local e = "exit"
-
-				if (craftable) print(c, x_mid - 3*#c - 6, r[4] - 6, 3)
-				print(e, x_mid + 3*#e, r[4] - 6, 5)
-
-				if (self.selected == 1) and craftable then
-					spr(59, x_mid - 4*#c - 6, r[4] - 8)
-				else
-					spr(59, x_mid + 4*#e - 9, r[4] - 8)
-				end
-			end
-		},
-
-		toggle = function(self)
-			if self.submenu.enabled then
-				self.submenu:close()
-			else
-				self.enabled = not self.enabled
-			end
-		end,
-
-		update = function(self)
-			if btnp(k_O) then
-				if self.submenu.enabled then
-					self.submenu:select()
-				else
-					self.submenu:open(self.items[self.selected])
-				end
-			end
-
-			if self.submenu.enabled and btnp(k_X) then
-				self.submenu:close()
-			end
-
-			if self.submenu.enabled then
-				self.submenu:update()
-				return
-			end
-
-			if btnp(k_down) and self.selected < #self.items then
-				self.selected += 1
-			elseif btnp(k_up) and self.selected > 1 then
-				self.selected -= 1
-			end
-
-		end,
 
 		draw = function(self)
 			spr(9, self.x, self.y, 2, 2)
@@ -413,51 +280,9 @@ function create_trader()
 			palt(11, false)
 
 			draw_hitbox(self)
-
-			if self.enabled then
-				-- apply camera offsets
-				local c = {cam.x, cam.y, cam.x, cam.y}
-				local bg = add_arr(c, self.bg)
-				local bp = add_arr(c, self.bp)
-				local ilist = add_arr(c, self.ilist)
-
-				-- background
-				rectfill(bg[1], bg[2], bg[3], bg[4], 5)
-
-				-- backpack overlay
-				rectfill(bp[1], bp[2], bp[3], bp[4], 15)
-				
-				-- title
-				local title = "craft"
-				print(title, bp[1] + 2, bp[2] + 2, 0)
-
-				-- draw items
-				rect(ilist[1], ilist[2], ilist[3], ilist[4], 3)
-
-				local cx_init = ilist[1] + 3
-				local cy_init = ilist[2] + 3
-				local cx = cx_init
-				local cy = cy_init
-
-				local i = 1
-				for item in all(self.items) do
-
-					if i == self.selected then
-						spr(59, cx, cy + 2)
-					end
-
-					draw_item(item, cx + 4, cy + 2)
-
-					print((item.disp_name or item.name), cx + 20, cy + 4, 0)
-
-					cy += 16
-					i += 1
-				end
-
-				if (self.submenu.enabled) self.submenu:draw()
-			end
 		end
-	}	
+	}
+
 	add(objects, t)
 
 	return t
@@ -598,7 +423,6 @@ function create_splash(x, y)
 
 	return splash
 end
-
 
 function create_fishing_spot(x, y, is_junk)
 	x = (x or cam.x) + flr(rnd(128))
@@ -1289,23 +1113,231 @@ function create_map_bounds()
 	add(objects, left)
 end
 
-function start_game()
-	states:update_state(states.game)
-	player = create_player(3*8, 16 * 8)
-	cam = {x=0, y=0}
-	trader = create_trader()
-	backpack_ui = create_backpack_ui()
-	create_map_bounds()
+-- MENUS
 
-	for _, f in pairs(fish) do 
-		player.backpack:add(f, 10) 
-	end
-	for _, j in pairs(junk) do 
-		player.backpack:add(j, 10) 
-	end
-	for _, i in pairs(items) do
-		player.backpack:add(i, 10)
-	end
+function create_trader_ui()
+	local w = 14 * 8
+	local h = 15 * 8
+	local bg = {2*8, 2*8, w, h}
+	local bp = {bg[1] + 4, bg[2] + 4, bg[3] - 4, bg[4] - 4}
+	local ilist = {bp[1] + 2, bp[2] + 8, bp[3] - 2, bp[4] - 2}
+
+	local t = {
+		x = 0,
+		y = 16 * 8,
+		w = w,
+		h = h,
+		bg = bg, -- background rect
+		bp = bp, -- backpack overlay rect
+		ilist = ilist, -- item list rect
+		hitbox = {x = 0, y = -4, w = 20, h = 20},
+
+		enabled = false,
+		selected = 1,
+		items = {
+			items.sm_box,
+			items.lg_box
+		},
+		submenu = {
+			selected = 1,
+			ilist = ilist,
+			item = nil,
+
+			set_item = function(self, item)
+				self.item = item
+			end,
+
+			on_left = function(self)
+				if (self.selected == 2) self.selected = 1	
+			end,
+
+			on_right = function(self)
+				if (self.selected == 1) self.selected = 2
+			end,
+
+			on_up = function(self)
+
+			end,
+
+			on_down = function(self)
+
+			end,
+
+			on_O = function(self)
+				if self.selected == 1 then
+					self:craft()
+				else
+					-- exit
+					menu_state = "trader"
+				end
+			end,
+
+			update = function(self)
+			end,
+
+			craftable = function(self)
+				if (not self.item) return
+
+				for name, qty in pairs(self.item.junk) do
+					local p_qty = player.backpack.junk[name].quantity
+					if (p_qty < qty) return false
+				end
+
+				for name, qty in pairs(self.item.fish) do
+					local f_qty = player.backpack.fish[name].quantity
+					if (f_qty < qty) return false
+				end
+			
+				return true
+			end,
+
+			craft = function(self)
+				if (not self:craftable()) return
+
+				for name, qty in pairs(self.item.junk) do
+					local j = junk[name]
+					player.backpack:rm(j, qty)
+				end
+
+				for name, qty in pairs(self.item.fish) do
+					local f = fish[name]
+					player.backpack:rm(f, qty)
+				end
+
+				for name, qty in pairs(self.item.items) do
+					local i = items[name]
+					player.backpack:rm(i, qty)
+				end
+
+				player.backpack:add(self.item, 1)
+			end,
+
+			draw = function(self)
+				-- draw base ui
+				trader_ui:draw()
+
+				local r = self.ilist
+				rectfill(r[1], r[2], r[3], r[4], 6)
+				rect(r[1], r[2], r[3], r[4], 3)
+
+				
+				local x_mid = flr(r[1] + (r[3]-r[1])/2)
+				local cx = r[1] + 4
+				local cy = r[2] + 4
+
+				local name = self.item.disp_name or self.item.name
+				local p_qty = player.backpack.items[self.item.name].quantity
+				draw_item(self.item, cx, cy)
+				print(name .. " X " .. p_qty, cx + 20, cy + 2, 0)
+
+				cy += 12
+
+				spr(57, x_mid - 4, cy, 1, 1, false, true)
+
+				cy += 12
+
+				for name, qty in pairs(self.item.junk) do
+					local p_qty = player.backpack.junk[name].quantity
+					local j = junk[name]
+					spr(j.k, cx, cy)
+					print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 2, 0)
+					cy += 14
+				end
+
+				for name, qty in pairs(self.item.fish) do
+					local p_qty = player.backpack.fish[name].quantity
+					local f = fish[name]
+					draw_fish(f, cx, cy)
+					print(f.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
+					cy += 16
+				end
+
+				local craftable = self:craftable()
+
+				local c = "craft"
+				local e = "exit"
+
+				if (craftable) print(c, x_mid - 3*#c - 6, r[4] - 6, 3)
+				print(e, x_mid + 3*#e, r[4] - 6, 5)
+
+				if (self.selected == 1) and craftable then
+					spr(59, x_mid - 4*#c - 6, r[4] - 8)
+				else
+					spr(59, x_mid + 4*#e - 9, r[4] - 8)
+				end
+			end
+		},
+
+		on_O = function(self)
+			self.submenu:set_item(self.item)
+			menu_state = "trader_submenu"
+		end,
+
+		on_left = function(self)
+
+		end,
+
+		on_right = function(self)
+
+		end,
+
+		on_up = function(self)
+			if self.selected > 1 then
+				self.selected -= 1
+			end
+		end,
+
+		on_down = function(self)
+			if self.selected < #self.items then
+				self.selected += 1
+			end
+		end,
+
+		update = function(self)
+			self.item = self.items[self.selected]
+		end,
+
+		draw = function(self)
+			local bg = self.bg
+			local bp = self.bp
+			local ilist = self.ilist
+
+			-- background
+			rectfill(bg[1], bg[2], bg[3], bg[4], 5)
+
+			-- backpack overlay
+			rectfill(bp[1], bp[2], bp[3], bp[4], 15)
+			
+			-- title
+			local title = "craft"
+			print(title, bp[1] + 2, bp[2] + 2, 0)
+
+			-- draw items
+			rect(ilist[1], ilist[2], ilist[3], ilist[4], 3)
+
+			local cx_init = ilist[1] + 3
+			local cy_init = ilist[2] + 3
+			local cx = cx_init
+			local cy = cy_init
+
+			local i = 1
+			for item in all(self.items) do
+
+				if i == self.selected then
+					spr(59, cx, cy + 2)
+				end
+
+				draw_item(item, cx + 4, cy + 2)
+
+				print((item.disp_name or item.name), cx + 20, cy + 4, 0)
+
+				cy += 16
+				i += 1
+			end
+		end
+	}	
+
+	return t
 end
 
 function create_backpack_ui()
@@ -1323,10 +1355,25 @@ function create_backpack_ui()
 		ilist = ilist, -- item list rect
 		curr_page = 1,
 		pages = {},
-		enabled = false,
 
-		toggle = function(self)
-			self.enabled = not self.enabled
+		on_O = function(self)
+
+		end,
+
+		on_left = function(self)
+			if (self.curr_page > 1) self.curr_page -= 1
+		end,
+
+		on_right = function(self)
+			if (self.curr_page < #self.pages) self.curr_page += 1
+		end,
+
+		on_up = function(self)
+
+		end,
+
+		on_down = function(self)
+
 		end,
 
 		update = function(self)
@@ -1388,23 +1435,13 @@ function create_backpack_ui()
 			end
 
 			self.pages = pages
-
-			if btnp(k_left) then
-				if (self.curr_page > 1) self.curr_page -= 1
-			elseif btnp(k_right) then
-				if (self.curr_page < #self.pages) self.curr_page += 1
-			end
 		end,
 
 		-- draw based on camera view
 		draw = function(self)
-			local page = {}
-
-			-- apply offsets
-			local c = {cam.x, cam.y, cam.x, cam.y}
-			local bg = add_arr(c, self.bg)
-			local bp = add_arr(c, self.bp)
-			local ilist = add_arr(c, self.ilist)
+			local bg = self.bg
+			local bp = self.bp
+			local ilist = self.ilist
 
 			-- background
 			rectfill(bg[1], bg[2], bg[3], bg[4], 4)
@@ -1469,11 +1506,60 @@ function create_backpack_ui()
 	return backpack_ui
 end
 
+-- GAME LOOP
+
+function load_map()
+    for x=1,128 do
+        for y=1,64 do
+            local tile = mget(x, y)
+            if contains(k_rocks, tile) then
+                add(objects, create_rock(x*8, y*8))
+			elseif tile == k_ice_block then
+				add(objects, create_ice_block(x*8, y*8))
+			end
+        end
+    end
+
+    -- debug=#objects
+end
+
+function _init()
+	states:update_state(states.start)
+	load_map()
+	-- music(0)
+end
+
+function start_game()
+	states:update_state(states.game)
+	player = create_player(5*8, 16 * 8)
+	cam = {x=0, y=0}
+	trader = create_trader()
+	trader_ui = create_trader_ui()
+	backpack_ui = create_backpack_ui()
+	create_map_bounds()
+	menu_state = nil
+	menu_states = {
+		trader = trader_ui,
+		trader_submenu = trader_ui.submenu,
+		backpack = backpack_ui
+	}
+
+	for _, f in pairs(fish) do 
+		player.backpack:add(f, 10) 
+	end
+	for _, j in pairs(junk) do 
+		player.backpack:add(j, 10) 
+	end
+	for _, i in pairs(items) do
+		player.backpack:add(i, 10)
+	end
+end
+
 states = {
 	state = nil,
 	start = {
 		_update = function()
-			if (btn(k_X)) start_game()
+			if (btnp(k_X)) start_game()
 		end,
 		_draw = function()
 			cls(1)
@@ -1486,21 +1572,37 @@ states = {
 		_update = function()
 			debug = ""
 
-			if btnp(k_X) then
-				if player:collide(trader.enter_zone, 0, 0) then
-					trader:toggle()
-				else
-					backpack_ui:toggle()
+			if not menu_state then
+				if btnp(k_X) then 
+					menu_state = "backpack"
+					return
+				elseif btnp(k_O) and player:collide(trader_ui, 0, 0) then
+					menu_state = "trader"
+					return
 				end
 			end
 
-			if trader.enabled then
-				trader:update()
-				return
-			end
+			if menu_state then
+				menu_states[menu_state]:update()
 
-			if backpack_ui.enabled then
-				backpack_ui:update()
+				if btnp(k_O) then
+					menu_states[menu_state]:on_O()
+				elseif btnp(k_X) then
+					if menu_state == "trader_submenu" then
+						menu_state = "trader"
+					elseif menu_state == "trader" or menu_state == "backpack" then
+						menu_state = nil
+					end
+				elseif btnp(k_up) then
+					menu_states[menu_state]:on_up()
+				elseif btnp(k_down) then
+					menu_states[menu_state]:on_down()
+				elseif btnp(k_left) then
+					menu_states[menu_state]:on_left()
+				elseif btnp(k_right) then
+					menu_states[menu_state]:on_right()
+				end
+
 				return
 			end
 
@@ -1541,9 +1643,8 @@ states = {
 		_draw = function()
 			cls()
 			-- palt(0, true)
-			map()
-
 			camera(cam.x, cam.y)
+			map()
 
 			for wave in all(waves) do
 				wave:draw()
@@ -1564,9 +1665,11 @@ states = {
 
 			player:draw()
 
-			trader:draw()
-
-			if (backpack_ui.enabled) backpack_ui:draw()
+			if menu_state then
+				camera(0, 0)
+				menu_states[menu_state]:draw()
+				camera(cam.x, cam.y)
+			end
 
 			-- debug = "missed: " .. missed
 			-- debug = "" .. get_region(player.x, player.y).id
@@ -1583,35 +1686,6 @@ states = {
 	end
 }
 
-function contains(table, element)
-	for _, value in pairs(table) do
-		if value == element then
-			return true
-		end
-	end
-	return false
-end
-
-function load_map()
-    for x=1,128 do
-        for y=1,64 do
-            local tile = mget(x, y)
-            if contains(k_rocks, tile) then
-                add(objects, create_rock(x*8, y*8))
-			elseif tile == k_ice_block then
-				add(objects, create_ice_block(x*8, y*8))
-			end
-        end
-    end
-
-    -- debug=#objects
-end
-
-function _init()
-	states:update_state(states.start)
-	load_map()
-	-- music(0)
-end
 
 __gfx__
 00000000ccccccccffffffff11111111bbbbbbbbbbbbbbbbbbbbbbbb445f445444540000f4444f44444ff44488000000bbbbbbbbbb1111bb0000000000000000
