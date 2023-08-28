@@ -46,37 +46,73 @@ item_types = {
 fish = {
 	bass = {
 		name = "bass",
+		disp_name = "bass",
 		k = 44,
 		t_col = 12, -- transparency color
-		rarity = "common",
 		type = item_types.fish,
 		dim = 2 -- 2x2
 	},
 	salmon = {
 		name = "salmon",
+		disp_name = "salmon",
 		k = 12,
 		t_col = 11, -- transparency color
-		rarity = "rare",
 		type = item_types.fish,
 		dim = 2 -- 2x2
+	},
+	pufferfish = {
+		name = "pufferfish",
+		disp_name = "pufferfish",
+		k = 14,
+		t_col = 12,
+		type = item_types.fish,
+		dim = 2
+	},
+	eel = {
+		name = "eel",
+		disp_name = "eel",
+		k = 46,
+		t_col = 12,
+		type = item_types.fish,
+		dim = 2
+	},
+	sardine = {
+		name = "sardine",
+		disp_name = "sardine",
+		k = 96,
+		t_col = 12,
+		type = item_types.fish,
+		dim = 2
+	},
+	golden_anchovy = {
+		name = "golden_anchovy",
+		disp_name = "golden anchovy",
+		k = 64,
+		t_col = 12,
+		legendary = true,
+		type = item_types.fish,
+		dim = 2
 	}
 }
 
 junk = {
 	metal = {
 		name = "metal",
+		disp_name = "metal",
 		k = 37,
 		type = item_types.junk,
 		dim = 1 -- 1x1
 	},
 	wood = {
 		name = "wood",
+		disp_name = "wood",
 		k = 38,
 		type = item_types.junk,
 		dim = 1 -- 1x1
 	},
 	bamboo = {
 		name = "bamboo",
+		disp_name = "bamboo",
 		k = 39,
 		type = item_types.junk,
 		dim = 1
@@ -86,6 +122,7 @@ junk = {
 items = {
 	cassette = {
 		name = "cassette",
+		disp_name = "cassette",
 		k = 43,
 		type = item_types.item,
 		dim = 1,
@@ -135,19 +172,35 @@ items = {
 regions = {
 	start = {
 		id = 1,
-		fish = {fish.bass, fish.salmon},
+		fish = {
+			common = {fish.bass},
+			rare = {fish.salmon},
+		},
 		junk = {junk.metal, junk.wood}
 	},
 	island = {
-		id = 2
+		id = 2,
+		fish = {
+			common = {fish.bass, fish.sardine},
+			rare = {fish.pufferfish},
+		},
+		junk = {junk.wood}
 	},
 	ice = {
 		id = 3,
-		fish = {fish.salmon},
+		fish = {
+			common = {fish.sardine},
+			rare = {fish.salmon},
+		},
 		junk = {junk.metal}
 	},
 	junk = {
-		id = 4
+		id = 4,
+		fish = {
+			common = {fish.eel},
+			rare = {fish.eel},
+		},
+		junk = {junk.metal, junk.wood}
 	}
 }
 
@@ -358,7 +411,11 @@ function create_waves()
 		if (r == regions.start) then
 			k = rnd() > .5 and 17 or 18
 		elseif (r == regions.ice) then
-			k =  rnd() > .5 and 51 or 52
+			k = rnd() > .5 and 51 or 52
+		elseif (r == regions.island) then
+			k = rnd() > .5 and 17 or 18
+		elseif (r == regions.junk) then
+			k = rnd() > .5 and 51 or 52
 		end
 
 		local wave = {
@@ -473,16 +530,16 @@ function create_fishing_spot(x, y, is_junk)
 			local f
 			if dt < .34 then
 				-- extra roll for rare
-				if rnd() > .5 then
+				if rnd() > .68 then
 					-- rare
-					f = sample(self.region.fish)
+					f = sample(self.region.fish.rare)
 				else
 					-- common
-					f = sample(self.region.fish)
+					f = sample(self.region.fish.common)
 				end
 			elseif dt < .68 then
 				-- common
-				f = sample(self.region.fish)
+				f = sample(self.region.fish.common)
 			else
 				-- missed
 				self.hook:missed()
