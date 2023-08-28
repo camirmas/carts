@@ -15,8 +15,10 @@ k_O = 4
 k_X = 5
 k_rock_start = 19
 k_rock_ice = 50
-k_rocks = {k_rock_start, k_rock_ice}
+k_rock_sharp = 73
+k_rocks = {k_rock_start, k_rock_ice, k_rock_sharp}
 k_ice_block = 49
+k_crabs = {34, 35}
 k_hook = 11 -- soon to have more
 k_alert = 21
 
@@ -84,9 +86,9 @@ fish = {
 		type = item_types.fish,
 		dim = 2
 	},
-	golden_anchovy = {
-		name = "golden_anchovy",
-		disp_name = "golden anchovy",
+	gold_anchovy = {
+		name = "gold_anchovy",
+		disp_name = "gold anchovy",
 		k = 64,
 		t_col = 12,
 		legendary = true,
@@ -101,12 +103,14 @@ junk = {
 		disp_name = "metal",
 		k = 37,
 		type = item_types.junk,
+		t_col = 0,
 		dim = 1, -- 1x1
 		off = {x = 2, y = 0}
 	},
 	wood = {
 		name = "wood",
 		disp_name = "wood",
+		t_col = 0,
 		k = 38,
 		type = item_types.junk,
 		dim = 1, -- 1x1
@@ -268,18 +272,14 @@ function draw_fish(fish, x, y)
 end
 
 function draw_item(item, x, y)
-	palt(0, false)
-	palt(item.t_col, true)
+	palt(item.t_col or 0, true)
 	spr(item.k, x + item.off.x, y + item.off.y, item.dim, item.dim)
-	palt(0, true)
-	palt(item.t_col, false)
+	palt(item.t_col or 0, false)
 end
 
 function draw_junk(junk, x, y)
-	palt(0, false)
 	palt(junk.t_col, true)
 	spr(junk.k, x + junk.off.x, y + junk.off.y, junk.dim, junk.dim)
-	palt(0, true)
 	palt(junk.t_col, false)
 end
 
@@ -359,8 +359,8 @@ function create_trader()
 end
 
 function create_octopus()
-	local x = 118*8 + 4
-	local y = 16 * 8 + 4
+	local x = 113*8
+	local y = 45 * 8
 	local o = {
 		x = x,
 		y = y,
@@ -385,6 +385,88 @@ function create_octopus()
 			spr(self.k, self.x, self.y, self.dim, self.dim)
 			palt(0, true)	
 			palt(self.t_col, false)
+
+			draw_hitbox(self.enter_zone)
+		end
+	}
+
+	add(objects, o)
+
+	return o
+end
+
+function create_seal()
+	local x = 37*8
+	local y = 57 * 8
+	local o = {
+		x = x,
+		y = y,
+		k = 98,
+		t_col = 12,
+		dim = 2,
+		hitbox = {x = 0, y = 0, w = 16, h = 16},
+
+		enter_zone = {
+			x = x - 8,
+			y = y - 4,
+			hitbox = {x=0, y=0, w=32, h=30}
+		},
+
+		update = {
+
+		},
+		
+		draw = function(self)
+			palt(0, false)	
+			palt(self.t_col, true)
+			spr(self.k, self.x, self.y, self.dim, self.dim)
+			palt(0, true)	
+			palt(self.t_col, false)
+
+			draw_hitbox(self.enter_zone)
+		end
+	}
+
+	add(objects, o)
+
+	return o
+end
+
+function create_crabs()
+	local x = 122*8
+	local y = 2 * 8
+	local crabs = {
+		{x=122*8 + 1, y=2*8},
+		{x=122*8 + 3, y=3*8},
+		{x=122*8 + 2, y=4*8},
+		{x=126*8 + 2, y=2*8 + 1},
+		{x=124*8 + 2, y=6*8},
+		{x=125*8 + 2, y=8*8},
+	}
+
+	local o = {
+		x = x,
+		y = y,
+		t_col = 0,
+		dim = 1,
+		hitbox = {x = 0, y = 0, w = 16, h = 16},
+
+		enter_zone = {
+			x = x - 8,
+			y = y,
+			hitbox = {x=0, y=0, w=16, h=30}
+		},
+
+		update = {
+
+		},
+		
+		draw = function(self)
+			for c in all(crabs) do
+				palt(self.t_col, true)
+				spr(k_crabs[1], c.x, c.y, self.dim, self.dim)
+				palt(self.t_col, false)
+			end
 
 			draw_hitbox(self.enter_zone)
 		end
@@ -1115,12 +1197,7 @@ function create_player(x, y)
 			-- draw fish/junk caught
 			elseif self.info_caught ~= nil and self.info_timer > 0 then
 				-- fish are 2x2
-				palt(0, false)
-				palt(self.info_caught.t_col, true)
-				local dim = self.info_caught.dim
-				spr(self.info_caught.k, p.x + 2, p.y - 6, dim, dim)
-				palt(0, true)
-				palt(self.info_caught.t_col, false)
+				draw_fish(self.info_caught, p.x + 2, p.y - 6)
 			end
 
 			-- draw hitbox (debug)
@@ -1158,15 +1235,7 @@ function create_obs(x, y, k)
     }
 end
 
-function create_rock(x, y)
-	local r = get_region(x, y)
-
-	local k
-	if (r == regions.start) then
-		k = k_rock_start
-	elseif (r == regions.ice) then
-		k = k_rock_ice
-	end
+function create_rock(x, y, k)
     local rock = create_obs(x, y, k)
     rock.hitbox = {x=1, y=3, w=7, h=5}
 
@@ -1253,6 +1322,14 @@ function create_octopus_ui()
 	return create_trade_ui(items.bamboo)
 end
 
+function create_crabs_ui()
+	return create_trade_ui(items.shiny_coin)
+end
+
+function create_seal_ui()
+	return create_trade_ui(items.cassette)
+end
+
 function create_trade_ui(trade_item, qty)
 	local w = 14 * 8
 	local h = 15 * 8
@@ -1315,6 +1392,11 @@ function create_trade_ui(trade_item, qty)
 				local f_qty = player.backpack.fish[name].quantity
 				if (f_qty < qty) return false
 			end
+
+			for name, qty in pairs(self.item.items) do
+				local i_qty = player.backpack.items[name].quantity
+				if (i_qty < qty) return false
+			end
 		
 			return true
 		end,
@@ -1374,14 +1456,16 @@ function create_trade_ui(trade_item, qty)
 
 			cy += 12
 
+			palt(0, true)
 			spr(57, x_mid - 4, cy, 1, 1, false, true)
+			palt(0, false)
 
 			cy += 12
 
 			for name, qty in pairs(self.item.junk) do
 				local p_qty = player.backpack.junk[name].quantity
 				local j = junk[name]
-				spr(j.k, cx, cy)
+				draw_junk(j, cx, cy)
 				print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 2, 0)
 				cy += 14
 			end
@@ -1394,6 +1478,14 @@ function create_trade_ui(trade_item, qty)
 				cy += 18
 			end
 
+			for name, qty in pairs(self.item.items) do
+				local p_qty = player.backpack.items[name].quantity
+				local i = items[name]
+				draw_item(i, cx, cy)
+				print(i.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
+				cy += 18
+			end
+
 			local tradeable = self:tradeable()
 
 			local c = "trade"
@@ -1402,11 +1494,13 @@ function create_trade_ui(trade_item, qty)
 			if (tradeable) print(c, x_mid - 3*#c - 6, r[4] - 6, 3)
 			print(e, x_mid + 3*#e, r[4] - 6, 5)
 
+			palt(0, true)
 			if (self.selected == 1) and tradeable then
 				spr(59, x_mid - 4*#c - 6, r[4] - 8)
 			else
 				spr(59, x_mid + 4*#e - 9, r[4] - 8)
 			end
+			palt(0, false)
 		end
 	}
 
@@ -1433,7 +1527,9 @@ function create_craft_ui()
 		selected = 1,
 		items = {
 			items.sm_box,
-			items.lg_box
+			items.lg_box,
+			items.music_box,
+			items.boombox,
 		},
 		submenu = {
 			selected = 1,
@@ -1484,6 +1580,11 @@ function create_craft_ui()
 					local f_qty = player.backpack.fish[name].quantity
 					if (f_qty < qty) return false
 				end
+
+				for name, qty in pairs(self.item.items) do
+					local i_qty = player.backpack.items[name].quantity
+					if (i_qty < qty) return false
+				end
 			
 				return true
 			end,
@@ -1524,20 +1625,22 @@ function create_craft_ui()
 
 				local name = self.item.disp_name or self.item.name
 				local p_qty = player.backpack.items[self.item.name].quantity
-				draw_item(self.item, cx, cy)
-				print(name .. " X " .. p_qty, cx + 20, cy + 2, 0)
+				draw_item(self.item, cx, cy-2)
+				print(name .. " X " .. 1, cx + 20, cy + 2, 0)
 
 				cy += 12
 
+				palt(0, true)
 				spr(57, x_mid - 4, cy, 1, 1, false, true)
+				palt(0, false)
 
 				cy += 12
 
 				for name, qty in pairs(self.item.junk) do
 					local p_qty = player.backpack.junk[name].quantity
 					local j = junk[name]
-					spr(j.k, cx, cy)
-					print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 2, 0)
+					draw_junk(j, cx, cy)
+					print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 2, 0)
 					cy += 14
 				end
 
@@ -1545,8 +1648,16 @@ function create_craft_ui()
 					local p_qty = player.backpack.fish[name].quantity
 					local f = fish[name]
 					draw_fish(f, cx, cy)
-					print(f.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
+					print(f.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
 					cy += 16
+				end
+
+				for name, qty in pairs(self.item.items) do
+					local p_qty = player.backpack.items[name].quantity
+					local i = items[name]
+					draw_item(i, cx, cy)
+					print(i.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
+					cy += 18
 				end
 
 				local craftable = self:craftable()
@@ -1557,11 +1668,13 @@ function create_craft_ui()
 				if (craftable) print(c, x_mid - 3*#c - 6, r[4] - 6, 3)
 				print(e, x_mid + 3*#e, r[4] - 6, 5)
 
+				palt(0, true)
 				if (self.selected == 1) and craftable then
 					spr(59, x_mid - 4*#c - 6, r[4] - 8)
 				else
 					spr(59, x_mid + 4*#e - 9, r[4] - 8)
 				end
+				palt(0, false)
 			end
 		},
 
@@ -1621,12 +1734,14 @@ function create_craft_ui()
 			for item in all(self.items) do
 
 				if i == self.selected then
-					spr(59, cx, cy + 2)
+					palt(0, true)
+					spr(59, cx, cy + 3)
+					palt(0, false)
 				end
 
-				draw_item(item, cx + 4, cy + 2)
+				draw_item(item, cx + 4, cy)
 
-				print((item.disp_name or item.name), cx + 20, cy + 4, 0)
+				print((item.disp_name or item.name), cx + 22, cy + 4, 0)
 
 				cy += 16
 				i += 1
@@ -1795,8 +1910,10 @@ function create_backpack_ui()
 			self.page_l.k = self.page_l.enabled and 59 or 58
 			self.page_r.k = self.page_r.enabled and 59 or 58
 
+			palt(0, true)
 			spr(self.page_l.k, self.page_l.x, self.page_l.y, 1, 1, true, false)
 			spr(self.page_r.k, self.page_r.x, self.page_r.y)
+			palt(0, false)
 
 			-- page number
 			local pn = #self.pages or 1
@@ -1816,7 +1933,7 @@ function load_map()
 			local land_flag = fget(tile, 1)
 			local land_flag_corner = fget(tile, 2)
             if contains(k_rocks, tile) then
-                add(objects, create_rock(x*8, y*8))
+                add(objects, create_rock(x*8, y*8, tile))
 			elseif tile == k_ice_block then
 				add(objects, create_ice_block(x*8, y*8))
 			elseif land_flag then
@@ -1838,19 +1955,25 @@ end
 
 function start_game()
 	states:update_state(states.game)
-	player = create_player(120*8, 14 * 8)
 	cam = {x=0, y=0}
 	trader = create_trader()
 	trader_ui = create_craft_ui()
 	backpack_ui = create_backpack_ui()
 	octopus = create_octopus()
 	octopus_ui = create_octopus_ui()
+	crabs = create_crabs()
+	crabs_ui = create_crabs_ui()
+	seal = create_seal()
+	seal_ui = create_seal_ui()
+	player = create_player(seal.x, seal.y - 2*8)
 	create_map_bounds()
 	menu_state = nil
 	menu_states = {
 		trader = trader_ui,
 		trader_submenu = trader_ui.submenu,
 		octopus = octopus_ui,
+		crabs = crabs_ui,
+		seal = seal_ui,
 		backpack = backpack_ui
 	}
 
@@ -1892,6 +2015,12 @@ states = {
 				elseif btnp(k_O) and player:collide(octopus.enter_zone, 0, 0) then
 					menu_state = "octopus"
 					return
+				elseif btnp(k_O) and player:collide(crabs.enter_zone, 0, 0) then
+					menu_state = "crabs"
+					return
+				elseif btnp(k_O) and player:collide(seal.enter_zone, 0, 0) then
+					menu_state = "seal"
+					return
 				end
 			end
 
@@ -1903,7 +2032,11 @@ states = {
 				elseif btnp(k_X) then
 					if menu_state == "trader_submenu" then
 						menu_state = "trader"
-					elseif menu_state == "trader" or menu_state == "backpack" or menu_state == "octopus" then
+					elseif menu_state == "trader" 
+						or menu_state == "backpack"
+						or menu_state == "octopus" 
+						or menu_state == "crabs" 
+						or menu_state == "seal" then
 						menu_state = nil
 					end
 				elseif btnp(k_up) then
@@ -2037,22 +2170,22 @@ ccc1cc1c1767677111d7661111d1d11111111111111111111111e1111111e111bb1991bb99999999
 cc1c1ccc767776771575d671111111111d1dd11111111d111111111111111111bb1771bb009999005500000099000000db3d3cc3cccccccc44353ccccccccccc
 c1c1cc11c767677c1555dd66111111111111111111111111171111711711111ebb1771bb000990005000000090000000c3bdcccccccccccc45553ccccccccccc
 1ccc1ccc1cccccc155555ddd1111111111111111131111111111111111111111bb9779bb000000000000000000000000ccd3cccccccccccc4444cccccccccccc
-ccccccccccccccccccccccccccccccccccccccccccccccccddddddddddddddddddddddddddddd5dd000000000000000000000000000000000000000000000000
-ccccccccccc44ccccccccc888ffcccccccccccccccccccccddddddddddddddddddddddddddd5d5dd000000000000000000000000000000000000000000000000
-ccccccccc44974ccccccc88ee8e8cccccccc00000000ccccddddddddddd6d6ddddddddddddd565dd000000000000000000000000000000000000000000000000
-ccccccc94970a4ccccccc2eeeeefcccccc000cccccc000ccdddddddddd6d6ddddddddddddd27566d000000000000000000000000000000000000000000000000
-cccccc94979aa4ccccccc0e8eee0cccccc0cccccccccc0ccdddddddddddddddddd6dd6dddd52776d000000000000000000000000000000000000000000000000
-cccccc4979aa4cccccccc2eeeeefcccccd555565865555dcddddddddddddddddd6d66dddd5752676000000000000000000000000000000000000000000000000
-cccccc499aa4cccccccccc2e8eecccccc55555555555555cddddddddddddddddddddddddd5552266000000000000000000000000000000000000000000000000
-ccccc4979a49cccccccccc2eee8cccccc55005555550055cdddddddddddddddddddddddd55555222000000000000000000000000000000000000000000000000
-ccccc479a4cccccccccc22eeeeeefcccc50000555500005cf9fff4ff2dddd2dddddddddd00000000000000000000000000000000000000000000000000000000
-cccc499a4ccccccccc22e8eee8eeefccc50000555500005cffbfffffdeddeddddedddddd00000000000000000000000000000000000000000000000000000000
-cc4479a4ccccccccc2ee8eeeee8e8eecc55005555550055cffbffbffd2ddd2dddd2ddd2d00000000000000000000000000000000000000000000000000000000
-c4999a4cccccccccce88ee8e8e8ee8ecc55555555555555cff3bfbf9ddedddeddddeddde00000000000000000000000000000000000000000000000000000000
-cc44a4cccccccccce8c2e8cecee8eceec66666666666666c9ff3bbffddd2d29ddd2ddd2d00000000000000000000000000000000000000000000000000000000
-ccc4a4ccccccccccce2ee2cece2c8ec8cd111111111111dcf4ff3f4fdded9ddded9d9edd00000000000000000000000000000000000000000000000000000000
-cccc4ccccccccccccece8ccececcc8ccccccccccccccccccffff3fffddd2ddddd2d2dddd00000000000000000000000000000000000000000000000000000000
-cccccccccccccccc8cce8ccececcc8ccccccccccccccccccffffff9fddd9ddddddd9dddd00000000000000000000000000000000000000000000000000000000
+ccccccccccccccccddddddddddddddddccccccccccccccccddddddddddddddddddddddddddddd5dddddddddddddddddd00000000000000000000000000000000
+ccccccccccc44cccdddddd88888dddddccccccccccccccccddddddddddddddddddddddddddd5d5dddddddddddddddddd00000000000000000000000000000000
+ccccccccc44974ccddddd88ee8e8ddddcccc00000000ccccddddddddddd6d6ddddddddddddd565dddddddd88888ddddd00000000000000000000000000000000
+ccccccc94970a4ccddddd2eeeee8ddddcc000cccccc000ccdddddddddd6d6ddddddddddddd27566dddddd88ee8e8dddd00000000000000000000000000000000
+cccccc94979aa4ccddddd0e8eee0ddddcc0cccccccccc0ccdddddddddddddddddd6dd6dddd52776dddddd2eeeee8dddd00000000000000000000000000000000
+cccccc4979aa4cccddddd2eeeee8ddddcd555565865555dcddddddddddddddddd6d66dddd5752676ddddd0e8eee0dddd00000000000000000000000000000000
+cccccc499aa4ccccdddddd2e8eedddddc55555555555555cddddddddddddddddddddddddd5552266ddddd2eeeee8dddd00000000000000000000000000000000
+ccccc4979a49ccccdddddd2eee8dddddc55dd577775dd55cdddddddddddddddddddddddd55555222dddddd2e8e8ddddd00000000000000000000000000000000
+ccccc479a4ccccccdddd22eeeeeeddddc5d11d5555d11d5cf9fff4ff2dddd2dddddddddd00000000dddd22eeeeeedddd00000000000000000000000000000000
+cccc499a4cccccccdd22e8eee8eeedddc5d11d5665d11d5cffbfffffdeddeddddedddddd00000000dd22e8eee8eeeddd00000000000000000000000000000000
+cc4479a4ccccccccd2ee8eeeee8e8eedc55dd5eeee5dd55cffbffbffd2ddd2dddd2ddd2d00000000d2ee8eeeee8e8eed00000000000000000000000000000000
+c4999a4ccccccccc2e88ee8e8e8ee8edc55555555555555cff3bfbf9ddedddeddddeddde000000002e88ee8e8e8ee8de00000000000000000000000000000000
+cc44a4cccccccccce8d2e82edee8edeec66666666666666c9ff3bbffddd2d29ddd2ddd2d00000000e8d2e82edee8eede00000000000000000000000000000000
+ccc4a4ccccccccccde2ee2dededd8ed8ccccccccccccccccf4ff3f4fdded9ddded9d9edd00000000de2ee28ed8edd8ed00000000000000000000000000000000
+cccc4cccccccccccdede8dedd8edd8edccccccccccccccccffff3fffddd2ddddd2d2dddd00000000dede8d8ed8eedd8e00000000000000000000000000000000
+cccccccccccccccc8dde8dedddedddedccccccccccccccccffffff9fddd9ddddddd9dddd000000008dde8ddedddeddde00000000000000000000000000000000
 ccccccccccccccccccccccccccccccccccccccccf9fff4ffff4fff9f000000000000000000000000000000000000000000000000000000000000000000000000
 cccccccccc555cccccccccccc55555cccc6666ccffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000
 ccccccccc5d675cccccccccc5566666cc400004cfffffffffffffffc000000000000000000000000000000000000000000000000000000000000000000000000
