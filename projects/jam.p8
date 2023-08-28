@@ -618,8 +618,6 @@ function create_splash(x, y)
 end
 
 function create_fishing_spot(x, y, is_junk)
-	x = (x or cam.x) + flr(rnd(128))
-	y = (y or cam.y) + flr(rnd(128))
 	local r = get_region(x, y)
 	local lifetime = rnd(30 * 20)
 
@@ -781,7 +779,9 @@ end
 
 function create_fishing_spots()
 	for i=1,n_fishing_spots do
-		create_fishing_spot()	
+		local x = cam.x + flr(rnd(128))
+		local y = cam.y + flr(rnd(128))
+		create_fishing_spot(x, y)	
 	end
 end
 
@@ -818,9 +818,7 @@ function create_hook(start, dir)
 			if self.spot and self.spot.bite then
 				local f = self.spot:check_catch()
 
-				if fish ~= nil then
-					self.caught = f
-				end
+				self.caught = f
 			end
 
 			self.spot = nil
