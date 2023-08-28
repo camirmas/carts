@@ -60,9 +60,9 @@ fish = {
 		type = item_types.fish,
 		dim = 2 -- 2x2
 	},
-	pufferfish = {
-		name = "pufferfish",
-		disp_name = "pufferfish",
+	puffer = {
+		name = "puffer",
+		disp_name = "puffer",
 		k = 14,
 		t_col = 12,
 		type = item_types.fish,
@@ -101,22 +101,17 @@ junk = {
 		disp_name = "metal",
 		k = 37,
 		type = item_types.junk,
-		dim = 1 -- 1x1
+		dim = 1, -- 1x1
+		off = {x = 2, y = 0}
 	},
 	wood = {
 		name = "wood",
 		disp_name = "wood",
 		k = 38,
 		type = item_types.junk,
-		dim = 1 -- 1x1
+		dim = 1, -- 1x1
+		off = {x = 2, y = 0}
 	},
-	bamboo = {
-		name = "bamboo",
-		disp_name = "bamboo",
-		k = 39,
-		type = item_types.junk,
-		dim = 1
-	}
 }
 
 items = {
@@ -126,7 +121,9 @@ items = {
 		k = 43,
 		type = item_types.item,
 		dim = 1,
-		off = {x = 0, y = 0},
+		-- trade for music box at seal
+		items = { music_box = 1 },
+		off = {x = 2, y = 4},
 	},
 	sm_box = {
 		name = "sm_box",
@@ -141,7 +138,7 @@ items = {
 		fish = {
 			bass = 5
 		},
-		off = {x = 2, y = 2},
+		off = {x = 3, y = 4},
 	},
 	lg_box = {
 		name = "lg_box",
@@ -154,9 +151,9 @@ items = {
 			metal = 4,
 		},
 		fish = {
-			salmon = 4
+			sardine = 5
 		},
-		off = {x = 0, y = 0},
+		off = {x = 1, y = 3},
 	},
 	shiny_coin = {
 		name = "shiny_coin",
@@ -164,7 +161,54 @@ items = {
 		k = 42,
 		type = item_types.item,
 		dim = 1,
-		off = {x = 0, y = 0},
+		-- trade for boombox at crabs
+		items = {boombox = 1},
+		off = {x = 2, y = 4},
+	},
+	ultimate_rod = {
+		name = "ultimate_rod",
+		disp_name = "ultimate rod",
+		k = 103,
+		type = item_types.item,
+		dim = 2,
+		items = {bamboo = 1, shiny_coin = 1},
+		off = {x = 0, y = -2}
+	},
+	music_box = {
+		name = "music_box",
+		disp_name = "music box",
+		k = 100,
+		type = item_types.item,
+		dim = 1,
+		items = { sm_box = 1 },
+		junk = { metal = 3 },
+		fish = { salmon = 3 },
+		t_col = 12,
+		off = {x = 1, y = 3}
+	},
+	boombox = {
+		name = "boombox",
+		disp_name = "boombox",
+		k = 68,
+		type = item_types.item,
+		dim = 2,
+		items = {cassette = 1, lg_box = 1},
+		fish = { eel = 5 },
+		t_col = 12,
+		off = {x = 0, y = -2}
+	},
+	bamboo = {
+		name = "bamboo",
+		disp_name = "bamboo",
+		k = 39,
+		type = item_types.item,
+		dim = 1,
+		-- trade for rare fish at octopus
+		fish = {
+			puffer = 3,
+			salmon = 3,
+		},
+		off = {x = 2, y = 3}
 	}
 }
 
@@ -182,7 +226,7 @@ regions = {
 		id = 2,
 		fish = {
 			common = {fish.bass, fish.sardine},
-			rare = {fish.pufferfish},
+			rare = {fish.puffer},
 		},
 		junk = {junk.wood}
 	},
@@ -192,7 +236,7 @@ regions = {
 			common = {fish.sardine},
 			rare = {fish.salmon},
 		},
-		junk = {junk.metal}
+		junk = {junk.metal, junk.wood}
 	},
 	junk = {
 		id = 4,
@@ -215,45 +259,6 @@ function contains(table, element)
 	return false
 end
 
--- DIALOGUE
-
-function dtb_init()
-    dtb_q={}
-    dtb_p=1
-    dtb_qt=nil
-end
-
-function dtb_update()
-    if #dtb_q~=0 then
-        dtb_p+=1
-        if dtb_p>#dtb_qt then
-            dtb_p=#dtb_qt
-            if btnp(k_O) then
-                del(dtb_q,dtb_qt)
-            dtb_qt=dtb_q[1]
-                dtb_p=1
-            end
-        elseif btnp(k_O) then
-            dtb_p=#dtb_qt
-        end
-    end
-end
-
-function dtb_draw()
-    if dtb_qt~=nil then
-        rectfill(2,105,125,125,1)
-        print(sub(dtb_qt,1,dtb_p),4,107,7)
-        if dtb_p==#dtb_qt then
-            print("🅾️",117,119,13)
-        end
-    end
-end
-
-function dtb_disp(str)
-    add(dtb_q,str)
-    if (#dtb_q==1) dtb_qt=dtb_q[1]
-end
-
 function draw_fish(fish, x, y)
 	palt(0, false)
 	palt(fish.t_col, true)
@@ -263,7 +268,19 @@ function draw_fish(fish, x, y)
 end
 
 function draw_item(item, x, y)
-	spr(item.k, x + item.off.x, y + item.off.y)
+	palt(0, false)
+	palt(item.t_col, true)
+	spr(item.k, x + item.off.x, y + item.off.y, item.dim, item.dim)
+	palt(0, true)
+	palt(item.t_col, false)
+end
+
+function draw_junk(junk, x, y)
+	palt(0, false)
+	palt(junk.t_col, true)
+	spr(junk.k, x + junk.off.x, y + junk.off.y, junk.dim, junk.dim)
+	palt(0, true)
+	palt(junk.t_col, false)
 end
 
 function get_region(x, y)
@@ -341,6 +358,43 @@ function create_trader()
 	return t
 end
 
+function create_octopus()
+	local x = 118*8 + 4
+	local y = 16 * 8 + 4
+	local o = {
+		x = x,
+		y = y,
+		k = 66,
+		t_col = 12,
+		dim = 2,
+		hitbox = {x = 0, y = 0, w = 16, h = 16},
+
+		enter_zone = {
+			x = x - 8,
+			y = y - 4,
+			hitbox = {x=0, y=0, w=32, h=30}
+		},
+
+		update = {
+
+		},
+		
+		draw = function(self)
+			palt(0, false)	
+			palt(self.t_col, true)
+			spr(self.k, self.x, self.y, self.dim, self.dim)
+			palt(0, true)	
+			palt(self.t_col, false)
+
+			draw_hitbox(self.enter_zone)
+		end
+	}
+
+	add(objects, o)
+
+	return o
+end
+
 function create_boat_particles(spd)
 	local x, y
 	local vx, vy
@@ -415,7 +469,7 @@ function create_waves()
 		elseif (r == regions.island) then
 			k = rnd() > .5 and 17 or 18
 		elseif (r == regions.junk) then
-			k = rnd() > .5 and 51 or 52
+			k = rnd() > .5 and 71 or 72
 		end
 
 		local wave = {
@@ -1126,6 +1180,29 @@ function create_ice_block(x, y)
     return r
 end
 
+function create_land(x, y, k)
+    local r = create_obs(x, y, k)
+    r.hitbox = {x=0, y=0, w=8, h=8}
+
+    return r
+end
+
+function create_land_corner(x, y, k)
+    local r = create_obs(x, y, k)
+
+	if k == 116 then
+		r.hitbox = {x=0, y=2, w=4, h=6}
+	elseif k == 117 then
+		r.hitbox = {x=3, y=0, w=4, h=6}
+	elseif k == 118 then
+		r.hitbox = {x=2, y=3, w=4, h=6}
+	elseif k == 102 then
+		r.hitbox = {x=0, y=0, w=5, h=6}
+	end
+
+    return r
+end
+
 function create_map_bounds()
 	local top = {
 		x = 0,
@@ -1172,7 +1249,11 @@ end
 
 -- MENUS
 
-function create_trader_ui()
+function create_octopus_ui()
+	return create_trade_ui(items.bamboo)
+end
+
+function create_trade_ui(trade_item, qty)
 	local w = 14 * 8
 	local h = 15 * 8
 	local bg = {2*8, 2*8, w, h}
@@ -1187,9 +1268,168 @@ function create_trader_ui()
 		bg = bg, -- background rect
 		bp = bp, -- backpack overlay rect
 		ilist = ilist, -- item list rect
+
+		selected = 1,
+		item = trade_item,
+		qty = qty or 1,
+
+		on_left = function(self)
+			if (self.selected == 2) self.selected = 1	
+		end,
+
+		on_right = function(self)
+			if (self.selected == 1) self.selected = 2
+		end,
+
+		on_up = function(self)
+
+		end,
+
+		on_down = function(self)
+
+		end,
+
+		on_O = function(self)
+			if self.selected == 1 and self.qty > 0 then
+				self:trade()
+				self.qty -= 1
+			else
+				-- exit
+				menu_state = nil
+			end
+		end,
+
+		update = function(self)
+		end,
+
+		tradeable = function(self)
+			if (not self.item) return
+			if (self.qty == 0) return
+
+			for name, qty in pairs(self.item.junk) do
+				local p_qty = player.backpack.junk[name].quantity
+				if (p_qty < qty) return false
+			end
+
+			for name, qty in pairs(self.item.fish) do
+				local f_qty = player.backpack.fish[name].quantity
+				if (f_qty < qty) return false
+			end
+		
+			return true
+		end,
+
+		trade = function(self)
+			if (not self:tradeable()) return
+
+			for name, qty in pairs(self.item.junk) do
+				local j = junk[name]
+				player.backpack:rm(j, qty)
+			end
+
+			for name, qty in pairs(self.item.fish) do
+				local f = fish[name]
+				player.backpack:rm(f, qty)
+			end
+
+			for name, qty in pairs(self.item.items) do
+				local i = items[name]
+				player.backpack:rm(i, qty)
+			end
+
+			player.backpack:add(self.item, 1)
+		end,
+
+		draw = function(self)
+			-- draw base ui
+			local bg = self.bg
+			local bp = self.bp
+			local ilist = self.ilist
+
+			-- background
+			rectfill(bg[1], bg[2], bg[3], bg[4], 5)
+
+			-- backpack overlay
+			rectfill(bp[1], bp[2], bp[3], bp[4], 15)
+			
+			-- title
+			local title = "trade"
+			print(title, bp[1] + 2, bp[2] + 2, 0)
+
+			local r = self.ilist
+			rectfill(r[1], r[2], r[3], r[4], 6)
+			rect(r[1], r[2], r[3], r[4], 3)
+
+			
+			local x_mid = flr(r[1] + (r[3]-r[1])/2)
+			local cx = r[1] + 4
+			local cy = r[2] + 4
+
+			local name = self.item.disp_name or self.item.name
+			local p_qty = player.backpack.items[self.item.name].quantity
+			draw_item(self.item, cx, cy)
+			print(name .. " X " .. self.qty, cx + 20, cy + 2, 0)
+
+			if (self.qty == 0) return
+
+			cy += 12
+
+			spr(57, x_mid - 4, cy, 1, 1, false, true)
+
+			cy += 12
+
+			for name, qty in pairs(self.item.junk) do
+				local p_qty = player.backpack.junk[name].quantity
+				local j = junk[name]
+				spr(j.k, cx, cy)
+				print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 2, 0)
+				cy += 14
+			end
+
+			for name, qty in pairs(self.item.fish) do
+				local p_qty = player.backpack.fish[name].quantity
+				local f = fish[name]
+				draw_fish(f, cx, cy)
+				print(f.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
+				cy += 18
+			end
+
+			local tradeable = self:tradeable()
+
+			local c = "trade"
+			local e = "exit"
+
+			if (tradeable) print(c, x_mid - 3*#c - 6, r[4] - 6, 3)
+			print(e, x_mid + 3*#e, r[4] - 6, 5)
+
+			if (self.selected == 1) and tradeable then
+				spr(59, x_mid - 4*#c - 6, r[4] - 8)
+			else
+				spr(59, x_mid + 4*#e - 9, r[4] - 8)
+			end
+		end
+	}
+
+	return t
+end
+
+function create_craft_ui()
+	local w = 14 * 8
+	local h = 15 * 8
+	local bg = {2*8, 2*8, w, h}
+	local bp = {bg[1] + 4, bg[2] + 4, bg[3] - 4, bg[4] - 4}
+	local ilist = {bp[1] + 2, bp[2] + 8, bp[3] - 2, bp[4] - 2}
+
+	local craft = {
+		x = 0,
+		y = 16 * 8,
+		w = w,
+		h = h,
+		bg = bg, -- background rect
+		bp = bp, -- backpack overlay rect
+		ilist = ilist, -- item list rect
 		hitbox = {x = 0, y = -4, w = 20, h = 20},
 
-		enabled = false,
 		selected = 1,
 		items = {
 			items.sm_box,
@@ -1394,12 +1634,12 @@ function create_trader_ui()
 		end
 	}	
 
-	return t
+	return craft
 end
 
 function create_backpack_ui()
 	local w = 14 * 8
-	local h = 14 * 8
+	local h = 15 * 8
 	local bg = {2*8, 2*8, w, h}
 	local bp = {bg[1] + 4, bg[2] + 4, bg[3] - 4, bg[4] - 4}
 	local ilist = {bp[1] + 2, bp[2] + 8, bp[3] - 2, bp[4] - 2}
@@ -1524,14 +1764,18 @@ function create_backpack_ui()
 				local item = res[1]
 				local qty = res[2]
 
-				print((item.disp_name or item.name) .. " X " .. qty, cx + 20, cy + 4, 0)
-
-				if (item.type ~= item_types.fish) then
-					spr(item.k, cx + 4, cy + 3, item.dim, item.dim)
-					cy += 16
-				else
+				if (item.type == item_types.fish) then
+					print((item.disp_name or item.name) .. " X " .. qty, cx + 20, cy + 4, 0)
 					draw_fish(item, cx, cy)
+					cy += 20
+				elseif item.type == item_types.item then
+					print((item.disp_name or item.name) .. " X " .. qty, cx + 18, cy + 4, 0)
+					draw_item(item, cx, cy)
 					cy += 18
+				elseif item.type == item_types.junk then
+					print((item.disp_name or item.name) .. " X " .. qty, cx + 18, cy + 2, 0)
+					draw_junk(item, cx, cy)
+					cy += 16
 				end
 			end
 
@@ -1569,10 +1813,16 @@ function load_map()
     for x=1,128 do
         for y=1,64 do
             local tile = mget(x, y)
+			local land_flag = fget(tile, 1)
+			local land_flag_corner = fget(tile, 2)
             if contains(k_rocks, tile) then
                 add(objects, create_rock(x*8, y*8))
 			elseif tile == k_ice_block then
 				add(objects, create_ice_block(x*8, y*8))
+			elseif land_flag then
+				add(objects, create_land(x*8, y*8, tile))
+			elseif land_flag_corner then
+				add(objects, create_land_corner(x*8, y*8, tile))
 			end
         end
     end
@@ -1588,16 +1838,19 @@ end
 
 function start_game()
 	states:update_state(states.game)
-	player = create_player(5*8, 16 * 8)
+	player = create_player(120*8, 14 * 8)
 	cam = {x=0, y=0}
 	trader = create_trader()
-	trader_ui = create_trader_ui()
+	trader_ui = create_craft_ui()
 	backpack_ui = create_backpack_ui()
+	octopus = create_octopus()
+	octopus_ui = create_octopus_ui()
 	create_map_bounds()
 	menu_state = nil
 	menu_states = {
 		trader = trader_ui,
 		trader_submenu = trader_ui.submenu,
+		octopus = octopus_ui,
 		backpack = backpack_ui
 	}
 
@@ -1636,6 +1889,9 @@ states = {
 				elseif btnp(k_O) and player:collide(trader_ui, 0, 0) then
 					menu_state = "trader"
 					return
+				elseif btnp(k_O) and player:collide(octopus.enter_zone, 0, 0) then
+					menu_state = "octopus"
+					return
 				end
 			end
 
@@ -1647,7 +1903,7 @@ states = {
 				elseif btnp(k_X) then
 					if menu_state == "trader_submenu" then
 						menu_state = "trader"
-					elseif menu_state == "trader" or menu_state == "backpack" then
+					elseif menu_state == "trader" or menu_state == "backpack" or menu_state == "octopus" then
 						menu_state = nil
 					end
 				elseif btnp(k_up) then
@@ -1722,18 +1978,22 @@ states = {
 
 			player:draw()
 
+			octopus:draw()
+
+			camera(0, 0)
 			if menu_state then
-				camera(0, 0)
 				menu_states[menu_state]:draw()
-				camera(cam.x, cam.y)
 			end
+
+			print(debug, 10, 10)
+
+			camera(cam.x, cam.y)
+
 
 			-- debug = "missed: " .. missed
 			-- debug = "" .. get_region(player.x, player.y).id
 			-- debug = "trader: " .. (trader.enabled and "yes" or "no")
 			-- debug = "backpack: " .. (backpack_ui.enabled and "yes" or "no")
-
-			print(debug, cam.x + 10, cam.y + 10)
 		end
 	},
 	update_state = function(self, s)
@@ -1796,19 +2056,19 @@ cccccccccccccccc8cce8ccececcc8ccccccccccccccccccffffff9fddd9ddddddd9dddd00000000
 ccccccccccccccccccccccccccccccccccccccccf9fff4ffff4fff9f000000000000000000000000000000000000000000000000000000000000000000000000
 cccccccccc555cccccccccccc55555cccc6666ccffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000
 ccccccccc5d675cccccccccc5566666cc400004cfffffffffffffffc000000000000000000000000000000000000000000000000000000000000000000000000
-ccccccc65d6075cccccccccc5606606ccf4aa4fcff4ffff99ffff4fc000000000000000000000000000000000000000000000000000000000000000000000000
-cccccc65d66675ccccccccc56666666cc449944c9fffffffffffffcc000000000000000000000000000000000000000000000000000000000000000000000000
-cccccc5d66d75ccccccccc446000600cc444444cf4ff9f4ff4f9ffcc000000000000000000000000000000000000000000000000000000000000000000000000
-ccccc5d66675ccccccccc444666666cccffffffcffffffffffffcccc000000000000000000000000000000000000000000000000000000000000000000000000
-ccccc5d6d765cccccccc5446666567ccccccccccffffff9fffcccccc000000000000000000000000000000000000000000000000000000000000000000000000
-cccc5d66755ccccccccc556666566cccfcccccccff9fff4fcccccccf000000000000000000000000000000000000000000000000000000000000000000000000
-cccc56675cccccccccc5566656675cccfffccccccfffffffcccccfff000000000000000000000000000000000000000000000000000000000000000000000000
-cc55d675cccccccccc4466666765cccc4f9ffcccccffffffcccff9f4000000000000000000000000000000000000000000000000000000000000000000000000
-c5d6675cccccccccc4446666765cccccfffffcccccf4ffffcccfffff000000000000000000000000000000000000000000000000000000000000000000000000
-cc5575ccccccccccc446667555ccccccffff4fcccccfffffccf4ffff000000000000000000000000000000000000000000000000000000000000000000000000
-ccc575ccccccccccc555555cccccccccffffffcccccff9f4ccffffff000000000000000000000000000000000000000000000000000000000000000000000000
-cccc5cccccccccccccccccccccccccccfffffffccccccfffcfffffff000000000000000000000000000000000000000000000000000000000000000000000000
-ccccccccccccccccccccccccccccccccf4fff9ffcccccccfff9fff4f000000000000000000000000000000000000000000000000000000000000000000000000
+ccccccc65d6075cccccccccc5606606ccf4aa4fcff4ffff99ffff4fc000d90000000000000000000000000000000000000000000000000000000000000000000
+cccccc65d66675ccccccccc56666666cc449944c9fffffffffffffcc00d039000000000000000000000000000000000000000000000000000000000000000000
+cccccc5d66d75ccccccccc446000600cc444444cf4ff9f4ff4f9ffcc00d003900000000000000000000000000000000000000000000000000000000000000000
+ccccc5d66675ccccccccc444666666cccffffffcffffffffffffcccc000d00390000000000000000000000000000000000000000000000000000000000000000
+ccccc5d6d765cccccccc5446666567ccccccccccffffff9fffcccccc0000d0039000000000000000000000000000000000000000000000000000000000000000
+cccc5d66755ccccccccc556666566cccfcccccccff9fff4fcccccccf0000d0039000000000000000000000000000000000000000000000000000000000000000
+cccc56675cccccccccc5566656675cccfffccccccfffffffcccccfff000d00003900000000000000000000000000000000000000000000000000000000000000
+cc55d675cccccccccc4466666765cccc4f9ffcccccffffffcccff9f4000d00003900000000000000000000000000000000000000000000000000000000000000
+c5d6675cccccccccc4446666765cccccfffffcccccf4ffffcccfffff00d000000390000000000000000000000000000000000000000000000000000000000000
+cc5575ccccccccccc446667555ccccccffff4fcccccfffffccf4ffff008000000390000000000000000000000000000000000000000000000000000000000000
+ccc575ccccccccccc555555cccccccccffffffcccccff9f4ccffffff007000000039000000000000000000000000000000000000000000000000000000000000
+cccc5cccccccccccccccccccccccccccfffffffccccccfffcfffffff000000000039000000000000000000000000000000000000000000000000000000000000
+ccccccccccccccccccccccccccccccccf4fff9ffcccccccfff9fff4f000000000039000000000000000000000000000000000000000000000000000000000000
 30303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030
 64646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464647564
 30305330303030303030303030303030303030303030303030303030303030303030303030303030303030303030301330303030303030303013303030303030
@@ -1874,7 +2134,7 @@ ccccccccccccccccccccccccccccccccf4fff9ffcccccccfff9fff4f000000000000000000000000
 30303013133030303030303030303030303030303030303030303030303030303030303030303030303030303030303030533030303030303030303030303030
 64646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464
 __gff__
-0000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000001010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000001010000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000020400000000000000000000000000040404000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __map__
 0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101656565656565
