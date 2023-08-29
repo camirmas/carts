@@ -42,7 +42,7 @@ boat_particles = {}
 item_types = {
 	fish = 1,
 	junk = 2,
-	item = 3,
+	item = 3
 }
 
 fish = {
@@ -253,6 +253,16 @@ regions = {
 }
 
 -- UTILITIES
+
+function collide(obj, other, dx, dy)
+	if other.x+other.hitbox.x+other.hitbox.w > obj.x+obj.hitbox.x+dx and 
+		other.y+other.hitbox.y+other.hitbox.h > obj.y+obj.hitbox.y+dy and
+		other.x+other.hitbox.x < obj.x+obj.hitbox.x+obj.hitbox.w+dx and 
+		other.y+other.hitbox.y < obj.y+obj.hitbox.y+obj.hitbox.h+dy then
+		return other
+	end
+	return nil
+end
 
 function contains(table, element)
 	for _, value in pairs(table) do
@@ -543,15 +553,12 @@ function create_waves()
 		local y = cam.y + flr(rnd(128))
 		local r = get_region(x, y)
 
-		local k
-		if (r == regions.start) then
-			k = rnd() > .5 and 17 or 18
-		elseif (r == regions.ice) then
+		local t_col = 12
+		k = rnd() > .5 and 17 or 18
+
+		if (r == regions.ice) then
 			k = rnd() > .5 and 51 or 52
-		elseif (r == regions.island) then
-			k = rnd() > .5 and 17 or 18
-		elseif (r == regions.junk) then
-			k = rnd() > .5 and 71 or 72
+			t_col = 1
 		end
 
 		local wave = {
@@ -576,9 +583,9 @@ function create_waves()
 			end,
 
 			draw = function(self)
-				palt(12, true)
+				palt(t_col, true)
 				spr(self.k, self.x, self.y)
-				palt(12, false)
+				palt(t_col, false)
 			end,
 		}	
 		add(waves, wave)
@@ -901,13 +908,7 @@ function create_hook(start, dir)
 		end,
 
         collide = function(self, other, dx, dy)
-            if other.x+other.hitbox.x+other.hitbox.w > self.x+self.hitbox.x+dx and 
-                other.y+other.hitbox.y+other.hitbox.h > self.y+self.hitbox.y+dy and
-                other.x+other.hitbox.x < self.x+self.hitbox.x+self.hitbox.w+dx and 
-                other.y+other.hitbox.y < self.y+self.hitbox.y+self.hitbox.h+dy then
-                return other
-            end
-            return nil
+			return collide(self, other, dx, dy)
         end,
 	}
 
@@ -932,9 +933,6 @@ function create_backpack()
 	end
 
 	local backpack = {
-		qty_fish = 0,
-		qty_junk = 0,
-		qty_items = 0,
 		junk = held_junk,
 		fish = held_fish,
 		items = held_items,
@@ -962,47 +960,41 @@ function create_backpack()
 		add_junk = function(self, j, qty)
 			if self.junk[j] then
 				self.junk[j].quantity = self.junk[j].quantity + qty
-				self.qty_junk += qty
 			end
 		end,
 
 		rm_junk = function(self, j, qty)
 			if self.junk[j] and self.junk[j].quantity - qty >= 0 then
 				self.junk[j].quantity = self.junk[j].quantity - qty
-				self.qty_junk -= qty
 			end
 		end,
 
 		add_fish = function(self, f, qty)
 			if self.fish[f] then
 				self.fish[f].quantity = self.fish[f].quantity + qty
-				self.qty_fish += qty
 			end
 		end,
 
 		rm_fish = function(self, f, qty)
 			if self.fish[f] and self.fish[f].quantity - qty >= 0 then
 				self.fish[f].quantity = self.fish[f].quantity - qty
-				self.qty_fish -= qty
 			end
 		end,
 
 		add_item = function(self, i, qty)
 			if self.items[i] then
 				self.items[i].quantity = self.items[i].quantity + qty
-				self.qty_items += qty
 			end
 		end,
 
 		rm_item = function(self, i, qty)
 			if self.items[i] and self.items[i].quantity - qty >= 0 then
 				self.items[i].quantity = self.items[i].quantity - qty
-				self.qty_items -= qty
 			end
 		end,
 	}
 
-	return backpack
+    return backpack
 end
 
 function create_player(x, y)
@@ -1115,13 +1107,16 @@ function create_player(x, y)
 
 			self:update_hitbox()
 
-			if not (btn(0) or btn(1) or btn(2) or btn(3)) then
+			if not (btn(k_left) or btn(k_right)) then
 				self.spd.x = self.spd.x * .85
+			end
+
+			if not (btn(k_up) or btn(k_down)) then
 				self.spd.y = self.spd.y * .85
 			end
 
 			if btn(k_left) then
-				self.spd.x = .5
+				self.spd.x = .7
 				self.dir.x = -1
 				self.cast_dir = {x=-1, y=0}
 				self.k_raft = 9
@@ -1130,7 +1125,7 @@ function create_player(x, y)
 			end
 
 			if btn(k_right) then
-				self.spd.x = .5
+				self.spd.x = .7
 				self.dir.x = 1
 				self.cast_dir = {x=1, y=0}
 				self.k_raft = 9
@@ -1139,7 +1134,7 @@ function create_player(x, y)
 			end
 
 			if btn(k_up) then
-				self.spd.y = .5
+				self.spd.y = .7
 				self.dir.y = -1
 				self.cast_dir = {x=0, y=-1}
 				self.k_raft = 7
@@ -1148,7 +1143,7 @@ function create_player(x, y)
 			end
 
 			if btn(k_down) then
-				self.spd.y = .5
+				self.spd.y = .7
 				self.dir.y = 1
 				self.cast_dir = {x=0, y=1}
 				self.k_raft = 7
@@ -1203,13 +1198,7 @@ function create_player(x, y)
         end,
 
         collide = function(self, other, dx, dy)
-            if other.x+other.hitbox.x+other.hitbox.w > self.x+self.hitbox.x+dx and 
-                other.y+other.hitbox.y+other.hitbox.h > self.y+self.hitbox.y+dy and
-                other.x+other.hitbox.x < self.x+self.hitbox.x+self.hitbox.w+dx and 
-                other.y+other.hitbox.y < self.y+self.hitbox.y+self.hitbox.h+dy then
-                return other
-            end
-            return nil
+			return collide(self, other, dx, dy)
         end,
 	}
 end
@@ -1528,6 +1517,7 @@ function create_craft_ui()
 			items.lg_box,
 			items.music_box,
 			items.boombox,
+			items.ultimate_rod
 		},
 		submenu = {
 			selected = 1,
@@ -1616,7 +1606,6 @@ function create_craft_ui()
 				rectfill(r[1], r[2], r[3], r[4], 6)
 				rect(r[1], r[2], r[3], r[4], 3)
 
-				
 				local x_mid = flr(r[1] + (r[3]-r[1])/2)
 				local cx = r[1] + 4
 				local cy = r[2] + 4
@@ -1638,7 +1627,7 @@ function create_craft_ui()
 					local p_qty = player.backpack.junk[name].quantity
 					local j = junk[name]
 					draw_junk(j, cx, cy)
-					print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 2, 0)
+					print(j.disp_name or j.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 2, 0)
 					cy += 14
 				end
 
@@ -1646,7 +1635,7 @@ function create_craft_ui()
 					local p_qty = player.backpack.fish[name].quantity
 					local f = fish[name]
 					draw_fish(f, cx, cy)
-					print(f.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
+					print(f.disp_name or f.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
 					cy += 16
 				end
 
@@ -1654,7 +1643,7 @@ function create_craft_ui()
 					local p_qty = player.backpack.items[name].quantity
 					local i = items[name]
 					draw_item(i, cx, cy)
-					print(i.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
+					print(i.disp_name or i.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
 					cy += 18
 				end
 
@@ -1792,52 +1781,27 @@ function create_backpack_ui()
 			local n_items = 0
 			local page = {}
 
-			for name, info in pairs(player.backpack.fish) do
-				local f = fish[name]
-				local qty = info.quantity
+			local bp = {player.backpack.fish, player.backpack.junk, player.backpack.items}
+			local types = {fish, junk, items}
+			local i = 1
 
-				if qty > 0 then
-					if n_items == 4 then
-						n_items = 0
-						add(pages, page)
-						page = {}
+			for bp_i in all(bp) do
+				for name, info in pairs(bp_i) do
+					local item = types[i][name]
+					local qty = info.quantity
+
+					if qty > 0 then
+						if n_items == 4 then
+							n_items = 0
+							add(pages, page)
+							page = {}
+						end
+
+						add(page, {item, qty})
+						n_items += 1
 					end
-
-					add(page, {f, qty})
-					n_items += 1
 				end
-			end
-
-			for name, info in pairs(player.backpack.junk) do
-				local j = junk[name]
-				local qty = info.quantity
-
-				if qty > 0 then
-					if n_items == 4 then
-						n_items = 0
-						add(pages, page)
-						page = {}
-					end
-
-					add(page, {j, qty})
-					n_items += 1
-				end
-			end
-
-			for name, info in pairs(player.backpack.items) do
-				local i = items[name]
-				local qty = info.quantity
-
-				if qty > 0 then
-					if n_items == 4 then
-						n_items = 0
-						add(pages, page)
-						page = {}
-					end
-
-					add(page, {i, qty})
-					n_items += 1
-				end
+				i += 1
 			end
 
 			if #page > 0 then
@@ -1946,6 +1910,7 @@ function load_map()
 end
 
 function _init()
+	start_screen = create_start_screen()
 	states:update_state(states.start)
 	load_map()
 	-- music(0)
@@ -1963,7 +1928,8 @@ function start_game()
 	crabs_ui = create_crabs_ui()
 	seal = create_seal()
 	seal_ui = create_seal_ui()
-	player = create_player(seal.x, seal.y - 2*8)
+	-- player = create_player(2*8, 2*8)
+	player = create_player(octopus.x, octopus.y - 3*8)
 	create_map_bounds()
 	menu_state = nil
 	menu_states = {
@@ -1986,39 +1952,103 @@ function start_game()
 	end
 end
 
+function create_start_screen()
+	local bubbles = {}
+
+	for i=1,100 do
+		local b = {
+			x = rnd(128),
+			y = 128+8,
+			vy = .8 * gauss_rng(),
+			r = 0,
+			col = sample({12, 5, 6, 13, 14}),
+			r_max = rnd(4),
+			t = 0,
+			dr = .05 * gauss_rng(),
+
+			update = function(self)
+				self.t += .01
+				self.x += .35 * cos(3.2*self.t)
+				self.y -= self.vy
+				self.r = min(self.r + self.dr, self.r_max)
+
+				if self.y < 0 then
+					self.y = 128+8
+					self.r = 0
+					self.t = 0
+				end
+			end,
+
+			draw = function(self)
+				circ(self.x, self.y, self.r, self.col)
+			end
+		}
+		add(bubbles, b)
+	end
+
+	local s = {
+		update = function(self)
+			for b in all(self.bubbles) do
+				b:update()
+			end
+		end,
+
+		draw = function(self)
+			cls(1)
+
+			print("nori", flr((128-3*4)/2), 5*8, 6)
+
+			for b in all(start_screen.bubbles) do
+				b:draw()
+			end
+				
+			local msg = "start: ❎"
+			print(debug, 10, 50)
+			print(msg, (128-#msg*4)/2, 12*8, 6)
+		end,
+
+		bubbles = bubbles
+	}
+
+	return s
+end
+
 states = {
 	state = nil,
 	start = {
 		_update = function()
-			if (btnp(k_X)) start_game()
+			if (btnp(k_X)) then
+				start_game()
+			else
+				start_screen:update()
+			end
 		end,
 		_draw = function()
-			cls(1)
-			local msg = "press ❎ to start"
-			print(debug, 10, 50)
-			print(msg, (128-#msg*4)/2, 12*8)
+			start_screen:draw()	
 		end
 	},
 	game = {
 		_update = function()
 			debug = ""
 
+			local traders = {
+				{trader_ui, "trader"}, 
+				{octopus.enter_zone, "octopus"}, 
+				{crabs.enter_zone, "crabs"}, 
+				{seal.enter_zone, "seal"}
+			}
+
 			if not menu_state then
 				if btnp(k_X) then 
 					menu_state = "backpack"
 					return
-				elseif btnp(k_O) and player:collide(trader_ui, 0, 0) then
-					menu_state = "trader"
-					return
-				elseif btnp(k_O) and player:collide(octopus.enter_zone, 0, 0) then
-					menu_state = "octopus"
-					return
-				elseif btnp(k_O) and player:collide(crabs.enter_zone, 0, 0) then
-					menu_state = "crabs"
-					return
-				elseif btnp(k_O) and player:collide(seal.enter_zone, 0, 0) then
-					menu_state = "seal"
-					return
+				elseif btnp(k_O) then
+					for t in all(traders) do
+						if player:collide(t[1], 0, 0) then
+							menu_state = t[2]
+							return
+						end
+					end
 				end
 			end
 
@@ -2152,27 +2182,27 @@ __gfx__
 00000000ccccccccc6c66cccc575d67cccbc9ccc59500000000000004454445444540000000000000000000000011000b1dc1bbbbbbbbbbbccc229494ff22ccc
 00000000ccccccccccccccccc555dd66ccc3cccc55500000000000004f5f4f5f4f540000000000000000000000000000bb161bbbbbbbbbbbcccc24242422cccc
 00000000cccccccccccccccc55555dddccc9cccc0000000000000000ff5fff5fff5f0000000000000000000000000000bbb1bbbbbbbbbbbbccccc2c2c2cccccc
-c11c1cc1000000000090090080900908ccccccccd500000045000000b3000000555555555555500005aa900055555555ccccccccc44dddccccccccc3333333cc
-1cc1c11c000000008080080880800808cbcccccc6d500000f4500000fb30000054464445564650005aaaa9005d7777d5cccccccc44b66dccccccc3355555b03c
-c11111c1000000008088880888888888cc3ccc3c06d500000f4500000fb3000054444645544450005aaaa900d1dccd1dcccccccc4a0b6dcccccc35564bbbbb33
-c1cc1c1c00000000088ee880008ee800cccbcccb006d500000f4500000fb3000564646455464500005aa90005deeeed5cccccc34bbabb3cccccc356b443333cc
-1c1111c1000000008088880808888880cc3ccc3c0006d500000f4500000fb30056464445555550000000000055555555cccc634bbbbbd3cccccc356b3ccccccc
-1cccc1c1000000000800008080800808bc9c9bcc00006d500000f4500000fb3056464645000000000000000000000000cc63b64b3bbd3ccccccc3566b33ccccc
-c1111111000000000000000000000000c3c3cccc000006d500000f4500000fb356444445000000000000000000000000cc3634b3b36d3cccccccc3556bb3cccc
-1c11cc1c000000000000000000000000ccc9cccc0000006d000000f4000000fb55555555000000000000000000000000ccc364b336d3cccccccccc3356bb3ccc
-1cc11ccc11111111111111111111111111111111111311111111111111111111babbbbab009999000000000000000000cccc4bbb66d3ccccccccccc3356b3ccc
-ccccc1c111111111111111111111111111111111111111d11111171113111711bb1111bb009999005000000090000000cccc4bb66d3ccccccccc3335556b3ccc
-c1ccccc11111111111167111111d1d11111111111d1111111511111111111111bb5116bb009999005500000099000000ccc4bb6dd3ccccccccc3555666bb3ccc
-ccc1cc1c1767677111d7661111d1d11111111111111111111111e1111111e111bb1991bb999999995550000099900000cc46b6d33ccccccccc35666bbbb3cccc
-11cc11c177667767115d77611111111111d11d11111111111111115111111111b111111b0999999055500000999000003dd3dd3b3ccccccccc35b333333ccccc
-cc1c1ccc767776771575d671111111111d1dd11111111d111111111111111111bb1771bb009999005500000099000000db3d3cc3cccccccc44353ccccccccccc
-c1c1cc11c767677c1555dd66111111111111111111111111171111711711111ebb1771bb000990005000000090000000c3bdcccccccccccc45553ccccccccccc
-1ccc1ccc1cccccc155555ddd1111111111111111131111111111111111111111bb9779bb000000000000000000000000ccd3cccccccccccc4444cccccccccccc
+00000000000000000090090080900908ccccccccd500000045000000b3000000555555555555500005aa900055555555ccccccccc44dddccccccccc3333333cc
+00000000000000008080080880800808cbcccccc6d500000f4500000fb30000054464445564650005aaaa9005d7777d5cccccccc44b66dccccccc3355555b03c
+00000000000000008088880888888888cc3ccc3c06d500000f4500000fb3000054444645544450005aaaa900d1dccd1dcccccccc4a0b6dcccccc35564bbbbb33
+0000000000000000088ee880008ee800cccbcccb006d500000f4500000fb3000564646455464500005aa90005deeeed5cccccc34bbabb3cccccc356b443333cc
+00000000000000008088880808888880cc3ccc3c0006d500000f4500000fb30056464445555550000000000055555555cccc634bbbbbd3cccccc356b3ccccccc
+00000000000000000800008080800808bc9c9bcc00006d500000f4500000fb3056464645000000000000000000000000cc63b64b3bbd3ccccccc3566b33ccccc
+00000000000000000000000000000000c3c3cccc000006d500000f4500000fb356444445000000000000000000000000cc3634b3b36d3cccccccc3556bb3cccc
+00000000000000000000000000000000ccc9cccc0000006d000000f4000000fb55555555000000000000000000000000ccc364b336d3cccccccccc3356bb3ccc
+0000000011111111111111111111111111111111111311111111111111111111babbbbab009999000000000000000000cccc4bbb66d3ccccccccccc3356b3ccc
+0000000011111111111111111111111111111111111111d11111171113111711bb1111bb009999005000000090000000cccc4bb66d3ccccccccc3335556b3ccc
+000000001111111111167111111d1d11111111111d1111111511111111111111bb5116bb009999005500000099000000ccc4bb6dd3ccccccccc3555666bb3ccc
+000000001767677111d7661111d1d11111111111111111111111e1111111e111bb1991bb999999995550000099900000cc46b6d33ccccccccc35666bbbb3cccc
+0000000077667767115d77611111111111d11d11111111111111115111111111b111111b0999999055500000999000003dd3dd3b3ccccccccc35b333333ccccc
+00000000767776771575d671111111111d1dd11111111d111111111111111111bb1771bb009999005500000099000000db3d3cc3cccccccc44353ccccccccccc
+00000000c767677c1555dd66111111111111111111111111171111711711111ebb1771bb000990005000000090000000c3bdcccccccccccc45553ccccccccccc
+000000001cccccc155555ddd1111111111111111131111111111111111111111bb9779bb000000000000000000000000ccd3cccccccccccc4444cccccccccccc
 ccccccccccccccccddddddddddddddddccccccccccccccccddddddddddddddddddddddddddddd5dddddddddddddddddd00000000000000000000000000000000
 ccccccccccc44cccdddddd88888dddddccccccccccccccccddddddddddddddddddddddddddd5d5dddddddddddddddddd00000000000000000000000000000000
-ccccccccc44974ccddddd88ee8e8ddddcccc00000000ccccddddddddddd6d6ddddddddddddd565dddddddd88888ddddd00000000000000000000000000000000
-ccccccc94970a4ccddddd2eeeee8ddddcc000cccccc000ccdddddddddd6d6ddddddddddddd27566dddddd88ee8e8dddd00000000000000000000000000000000
-cccccc94979aa4ccddddd0e8eee0ddddcc0cccccccccc0ccdddddddddddddddddd6dd6dddd52776dddddd2eeeee8dddd00000000000000000000000000000000
+ccccccccc44974ccddddd88ee8e8ddddcccc11111111ccccddddddddddd6d6ddddddddddddd565dddddddd88888ddddd00000000000000000000000000000000
+ccccccc94970a4ccddddd2eeeee8ddddcc111cccccc111ccdddddddddd6d6ddddddddddddd27566dddddd88ee8e8dddd00000000000000000000000000000000
+cccccc94979aa4ccddddd0e8eee0ddddcc1cccccccccc1ccdddddddddddddddddd6dd6dddd52776dddddd2eeeee8dddd00000000000000000000000000000000
 cccccc4979aa4cccddddd2eeeee8ddddcd555565865555dcddddddddddddddddd6d66dddd5752676ddddd0e8eee0dddd00000000000000000000000000000000
 cccccc499aa4ccccdddddd2e8eedddddc55555555555555cddddddddddddddddddddddddd5552266ddddd2eeeee8dddd00000000000000000000000000000000
 ccccc4979a49ccccdddddd2eee8dddddc55dd577775dd55cdddddddddddddddddddddddd55555222dddddd2e8e8ddddd00000000000000000000000000000000
