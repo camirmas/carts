@@ -1364,7 +1364,7 @@ function create_trade_ui(trade_item, qty)
 		end,
 
 		on_O = function(self)
-			if self.selected == 1 and self.qty > 0 then
+			if self.selected == 1 and self.qty > 0 and self:tradeable() then
 				self:trade()
 				self.qty -= 1
 			else
@@ -1444,10 +1444,9 @@ function create_trade_ui(trade_item, qty)
 			local cx = r[1] + 4
 			local cy = r[2] + 4
 
-			local name = self.item.disp_name or self.item.name
 			local p_qty = player.backpack.items[self.item.name].quantity
 			draw_item(self.item, cx, cy)
-			print(name .. " X " .. self.qty, cx + 20, cy + 2, 0)
+			print(self.item.disp_name .. " X " .. self.qty, cx + 20, cy + 2, 0)
 
 			if (self.qty == 0) return
 
@@ -1463,7 +1462,7 @@ function create_trade_ui(trade_item, qty)
 				local p_qty = player.backpack.junk[name].quantity
 				local j = junk[name]
 				draw_junk(j, cx, cy)
-				print(j.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 2, 0)
+				print(j.disp_name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 2, 0)
 				cy += 14
 			end
 
@@ -1471,7 +1470,7 @@ function create_trade_ui(trade_item, qty)
 				local p_qty = player.backpack.fish[name].quantity
 				local f = fish[name]
 				draw_fish(f, cx, cy)
-				print(f.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
+				print(f.disp_name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
 				cy += 18
 			end
 
@@ -1479,7 +1478,7 @@ function create_trade_ui(trade_item, qty)
 				local p_qty = player.backpack.items[name].quantity
 				local i = items[name]
 				draw_item(i, cx, cy)
-				print(i.name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
+				print(i.disp_name .. " X " .. p_qty .. "/" .. qty, cx + 20, cy + 4, 0)
 				cy += 18
 			end
 
