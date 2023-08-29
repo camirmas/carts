@@ -169,9 +169,9 @@ items = {
 		items = {boombox = 1},
 		off = {x = 2, y = 4},
 	},
-	ultimate_rod = {
-		name = "ultimate_rod",
-		disp_name = "ultimate rod",
+	super_rod = {
+		name = "super_rod",
+		disp_name = "super rod",
 		k = 103,
 		type = item_types.item,
 		dim = 2,
@@ -624,17 +624,15 @@ function create_splash(x, y)
 	return splash
 end
 
-function create_fishing_spot(x, y, is_junk)
-	local r = get_region(x, y)
-	local lifetime = rnd(30 * 20)
-
+function create_fishing_spot(x, y, is_junk, is_legendary)
 	local spot = {
 		x = x,
 		y = y,
-		region = r,
+		region = get_region(x, y),
 		hitbox = {x=-8, y=-8, w=16, h=16},
-		t = lifetime, -- time remaining
+		t = rnd(30 * 20), -- time remaining
 		time_to_bite = 0, -- time until bite
+		is_legendary = is_legendary,
 		is_junk = is_junk, -- is this a junk spot
 		bite = false,
 		bite_start = nil, -- when the bite started
@@ -653,40 +651,49 @@ function create_fishing_spot(x, y, is_junk)
 
 			local dt = time() - self.bite_start
 
-			if self.is_junk then
+			local catch
+
+			-- check legendary catch (super rod only)
+			if self.is_legendary then
+				if dt < .34 and player.backpack.items.super_rod.quantity > 0 then
+					self.to_delete = true
+					catch = fish.gold_anchovy
+				else
+					-- missed
+					self.hook:missed()
+				end
+
+			elseif self.is_junk then
 				-- check junk catch
-				local j
 				if 	dt < .68 then
-					j = sample(self.region.junk)
+					catch = sample(self.region.junk)
 				else
 					self.hook:missed()
 				end
 
 				self.to_delete = true
 
-				return j
-			end
-
 			-- check fish catch
-			local f
-			if dt < .34 then
-				-- extra roll for rare
-				if rnd() > .68 then
-					-- rare
-					f = sample(self.region.fish.rare)
-				else
-					-- common
-					f = sample(self.region.fish.common)
-				end
-			elseif dt < .68 then
-				-- common
-				f = sample(self.region.fish.common)
 			else
-				-- missed
-				self.hook:missed()
+				if dt < .34 then
+					-- extra roll for rare
+					if rnd() > .68 then
+						-- rare
+						catch = sample(self.region.fish.rare)
+					else
+						-- common
+						catch = sample(self.region.fish.common)
+					end
+				elseif dt < .68 then
+					-- common
+					catch = sample(self.region.fish.common)
+				else
+					-- missed
+					self.hook:missed()
+				end
 			end
 
-			return f
+			return catch
 		end,
 
 		update = function(self)
@@ -703,7 +710,7 @@ function create_fishing_spot(x, y, is_junk)
 			end
 
 			-- remove spots that are outside the camera view
-			if (self.t <= 0 or 
+			if not self.is_legendary and (self.t <= 0 or 
 				self.x < cam.x or 
 				self.x > cam.x + 128 or 
 				self.y < cam.y or 
@@ -728,7 +735,8 @@ function create_fishing_spot(x, y, is_junk)
 
 				if dt >= 0.68 then
 					self.hook:missed()
-					self.to_delete = true
+
+					if (not self.is_legendary) self.to_delete = true
 				end
 			end
 		end,
@@ -769,7 +777,9 @@ function create_fishing_spot(x, y, is_junk)
 
 			draw = function(self)
 				local col
-				if self.regions == regions.start then
+				if spot.is_legendary then
+					col = 10
+				elseif self.regions == regions.start then
 					col = 1	
 				elseif self.region == regions.ice then
 					col = 6
@@ -1517,7 +1527,7 @@ function create_craft_ui()
 			items.lg_box,
 			items.music_box,
 			items.boombox,
-			items.ultimate_rod
+			items.super_rod
 		},
 		submenu = {
 			selected = 1,
@@ -1929,7 +1939,7 @@ function start_game()
 	seal = create_seal()
 	seal_ui = create_seal_ui()
 	-- player = create_player(2*8, 2*8)
-	player = create_player(octopus.x, octopus.y - 3*8)
+	player = create_player(54*8, 8*8)
 	create_map_bounds()
 	menu_state = nil
 	menu_states = {
@@ -1941,15 +1951,19 @@ function start_game()
 		backpack = backpack_ui
 	}
 
-	for _, f in pairs(fish) do 
-		player.backpack:add(f, 10) 
-	end
-	for _, j in pairs(junk) do 
-		player.backpack:add(j, 10) 
-	end
-	for _, i in pairs(items) do
-		player.backpack:add(i, 10)
-	end
+	-- for _, f in pairs(fish) do 
+	-- 	player.backpack:add(f, 10) 
+	-- end
+	-- for _, j in pairs(junk) do 
+	-- 	player.backpack:add(j, 10) 
+	-- end
+	-- for _, i in pairs(items) do
+	-- 	player.backpack:add(i, 10)
+	-- end
+
+	-- add legendary fishing spots
+	add(fishing_spots, create_fishing_spot(4*8, 62*8, false, true))
+	add(fishing_spots, create_fishing_spot(54*8, 4*8, false, true))
 end
 
 function create_start_screen()
@@ -2060,11 +2074,7 @@ states = {
 				elseif btnp(k_X) then
 					if menu_state == "trader_submenu" then
 						menu_state = "trader"
-					elseif menu_state == "trader" 
-						or menu_state == "backpack"
-						or menu_state == "octopus" 
-						or menu_state == "crabs" 
-						or menu_state == "seal" then
+					else
 						menu_state = nil
 					end
 				elseif btnp(k_up) then
