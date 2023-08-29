@@ -159,9 +159,9 @@ items = {
 		},
 		off = {x = 1, y = 3},
 	},
-	shiny_coin = {
-		name = "shiny_coin",
-		disp_name = "shiny coin",
+	coin = {
+		name = "coin",
+		disp_name = "coin",
 		k = 42,
 		type = item_types.item,
 		dim = 1,
@@ -175,7 +175,7 @@ items = {
 		k = 103,
 		type = item_types.item,
 		dim = 2,
-		items = {bamboo = 1, shiny_coin = 1},
+		items = {bamboo = 1, coin = 1},
 		off = {x = 0, y = -2}
 	},
 	music_box = {
@@ -1320,7 +1320,7 @@ function create_octopus_ui()
 end
 
 function create_crabs_ui()
-	return create_trade_ui(items.shiny_coin)
+	return create_trade_ui(items.coin)
 end
 
 function create_seal_ui()
@@ -1637,7 +1637,7 @@ function create_craft_ui()
 					local p_qty = player.backpack.junk[name].quantity
 					local j = junk[name]
 					draw_junk(j, cx, cy)
-					print(j.disp_name or j.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 2, 0)
+					print((j.disp_name or j.name) .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 2, 0)
 					cy += 14
 				end
 
@@ -1645,7 +1645,7 @@ function create_craft_ui()
 					local p_qty = player.backpack.fish[name].quantity
 					local f = fish[name]
 					draw_fish(f, cx, cy)
-					print(f.disp_name or f.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
+					print((f.disp_name or f.name) .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
 					cy += 16
 				end
 
@@ -1653,7 +1653,7 @@ function create_craft_ui()
 					local p_qty = player.backpack.items[name].quantity
 					local i = items[name]
 					draw_item(i, cx, cy)
-					print(i.disp_name or i.name .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
+					print((i.disp_name or i.name) .. " X " .. p_qty .. "/" .. qty, cx + 22, cy + 4, 0)
 					cy += 18
 				end
 
@@ -1888,7 +1888,7 @@ function create_backpack_ui()
 			palt(0, false)
 
 			-- page number
-			local pn = #self.pages or 1
+			local pn = (#self.pages > 0) and #self.pages or 1
 			print("" .. self.curr_page .. " / " .. pn, self.page_l.x + 14, self.page_l.y + 1, 5)
 		end,
 	}
@@ -1938,8 +1938,8 @@ function start_game()
 	crabs_ui = create_crabs_ui()
 	seal = create_seal()
 	seal_ui = create_seal_ui()
-	-- player = create_player(2*8, 2*8)
-	player = create_player(54*8, 8*8)
+	player = create_player(2*8, 2*8)
+	-- player = create_player(54*8, 8*8)
 	create_map_bounds()
 	menu_state = nil
 	menu_states = {
